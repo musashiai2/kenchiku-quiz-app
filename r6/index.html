@@ -42,9 +42,9 @@
                     <h3>試験概要</h3>
                     <ul>
                         <li><strong>午前の部:</strong> 問題1〜44（44問）</li>
-                        <li><strong>午後の部:</strong> 問題45〜72（22問）※四肢択一のみ</li>
+                        <li><strong>午後の部:</strong> 問題45〜50、61〜72（18問）※四肢択一のみ</li>
                         <li><strong>出題形式:</strong> 四肢択一式</li>
-                        <li><strong>合計:</strong> 66問</li>
+                        <li><strong>合計:</strong> 62問</li>
                     </ul>
                     <p style="font-size: 0.85rem; color: var(--text-light); margin-top: 10px;">
                         ※問題51〜60（応用能力問題・五肢二択）は除外しています
@@ -77,7 +77,7 @@
                 <h3>学習モードを選択</h3>
                 <button class="btn btn-primary" onclick="startQuiz('all')">
                     <span class="btn-icon">📝</span>
-                    全問題（66問）
+                    全問題（62問）
                 </button>
                 <button class="btn btn-secondary" onclick="startQuiz('am')">
                     <span class="btn-icon">🌅</span>
@@ -85,7 +85,7 @@
                 </button>
                 <button class="btn btn-secondary" onclick="startQuiz('pm')">
                     <span class="btn-icon">🌆</span>
-                    午後の部（22問）
+                    午後の部（18問）
                 </button>
                 <button class="btn btn-accent" onclick="startQuiz('random')">
                     <span class="btn-icon">🎲</span>
@@ -128,7 +128,7 @@
                     </button>
                 </div>
                 <div class="progress-info">
-                    <span id="current-num">1</span> / <span id="total-num">66</span>
+                    <span id="current-num">1</span> / <span id="total-num">62</span>
                 </div>
                 <div class="progress-bar">
                     <div id="progress" class="progress-fill"></div>
@@ -170,7 +170,7 @@
                     <span class="score-label">点</span>
                 </div>
                 <div class="result-details">
-                    <p>正解数: <span id="result-correct">0</span> / <span id="result-total">66</span></p>
+                    <p>正解数: <span id="result-correct">0</span> / <span id="result-total">62</span></p>
                     <p>正答率: <span id="result-rate">0</span>%</p>
                     <p class="wrong-count-result">間違い: <span id="wrong-in-session">0</span>問</p>
                 </div>
