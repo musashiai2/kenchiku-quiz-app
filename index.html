@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1級建築施工管理技術検定 過去問クイズ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #2563eb;
+            --accent-color: #8b5cf6;
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --text-light: #64748b;
+            --border-color: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        body.dark-mode {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f1f5f9;
+            --text-light: #94a3b8;
+            --border-color: #334155;
+        }
+
+        body {
+            font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        body.dark-mode {
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .dark-mode-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: var(--card-bg);
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            font-size: 1.2rem;
+            z-index: 1000;
+            transition: all 0.2s ease;
+        }
+
+        .dark-mode-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .header {
+            text-align: center;
+            padding: 50px 20px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: var(--text-light);
+            font-size: 1rem;
+        }
+
+        .badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            color: white;
+            padding: 8px 20px;
+            border-radius: 30px;
+            margin-top: 15px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .year-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .year-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: var(--text-color);
+            display: block;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .year-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .year-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+        }
+
+        .year-card h2 {
+            font-size: 1.4rem;
+            margin-bottom: 12px;
+            color: var(--primary-color);
+        }
+
+        .year-card .info {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            margin-bottom: 8px;
+        }
+
+        .year-card .questions {
+            display: inline-block;
+            background: var(--bg-color);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .year-card .arrow {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .year-card:hover .arrow {
+            opacity: 1;
+            right: 15px;
+        }
+
+        .features {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 30px;
+        }
+
+        .features h3 {
+            color: var(--primary-color);
+            margin-bottom: 16px;
+            font-size: 1.1rem;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: var(--bg-color);
+            border-radius: 10px;
+        }
+
+        .feature-icon {
+            font-size: 1.3rem;
+        }
+
+        .feature-text {
+            font-size: 0.9rem;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85rem;
+        }
+
+        body.dark-mode .footer {
+            color: var(--text-light);
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .year-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="dark-mode-btn" onclick="toggleDarkMode()" title="ダークモード">
+        🌙
+    </button>
+
+    <div class="container">
+        <div class="header">
+            <h1>1級建築施工管理技術検定</h1>
+            <p>第一次検定 過去問クイズアプリ</p>
+            <span class="badge">令和1年度〜令和7年度 対応</span>
+        </div>
+
+        <div class="features">
+            <h3>アプリの機能</h3>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <span class="feature-icon">📝</span>
+                    <span class="feature-text">四肢択一式問題</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">⏱️</span>
+                    <span class="feature-text">タイマー付き本番モード</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🔄</span>
+                    <span class="feature-text">間違い問題の復習</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">⭐</span>
+                    <span class="feature-text">ブックマーク機能</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📊</span>
+                    <span class="feature-text">学習統計・履歴</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🌙</span>
+                    <span class="feature-text">ダークモード対応</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="year-grid">
+            <a href="r7/index.html" class="year-card">
+                <h2>令和7年度</h2>
+                <p class="info">2025年実施</p>
+                <span class="questions">62問</span>
+                <span class="arrow">→</span>
+            </a>
+            <a href="r6/index.html" class="year-card">
+                <h2>令和6年度</h2>
+                <p class="info">2024年実施</p>
+                <span class="questions">66問</span>
+                <span class="arrow">→</span>
+            </a>
+            <a href="r5/index.html" class="year-card">
+                <h2>令和5年度</h2>
+                <p class="info">2023年実施</p>
+                <span class="questions">66問</span>
+                <span class="arrow">→</span>
+            </a>
+            <a href="r4/index.html" class="year-card">
+                <h2>令和4年度</h2>
+                <p class="info">2022年実施</p>
+                <span class="questions">66問</span>
+                <span class="arrow">→</span>
+            </a>
+            <a href="r3/index.html" class="year-card">
+                <h2>令和3年度</h2>
+                <p class="info">2021年実施</p>
+                <span class="questions">66問</span>
+                <span class="arrow">→</span>
+            </a>
+            <a href="r2/index.html" class="year-card">
+                <h2>令和2年度</h2>
+                <p class="info">2020年実施</p>
+                <span class="questions">66問</span>
+                <span class="arrow">→</span>
+            </a>
+            <a href="r1/index.html" class="year-card">
+                <h2>令和1年度</h2>
+                <p class="info">2019年実施</p>
+                <span class="questions">66問</span>
+                <span class="arrow">→</span>
+            </a>
+        </div>
+
+        <div class="footer">
+            <p>※五肢択一式の応用能力問題は除外しています</p>
+        </div>
+    </div>
+
+    <script>
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('quiz_dark_mode', isDark);
+            updateDarkModeButton();
+        }
+
+        function updateDarkModeButton() {
+            const btn = document.querySelector('.dark-mode-btn');
+            const isDark = document.body.classList.contains('dark-mode');
+            btn.innerHTML = isDark ? '☀️' : '🌙';
+            btn.title = isDark ? 'ライトモード' : 'ダークモード';
+        }
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            const darkMode = localStorage.getItem('quiz_dark_mode') === 'true';
+            if (darkMode) {
+                document.body.classList.add('dark-mode');
+                updateDarkModeButton();
+            }
+        });
+    </script>
+</body>
+</html>

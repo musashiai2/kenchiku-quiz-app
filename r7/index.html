@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>令和7年度 1級建築施工管理技術検定 学科試験</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- ダークモードボタン -->
+        <button id="dark-mode-btn" class="dark-mode-btn" onclick="toggleDarkMode()" title="ダークモード">
+            🌙
+        </button>
+
+        <!-- スタート画面 -->
+        <div id="start-screen" class="screen active">
+            <div class="header">
+                <h1>1級建築施工管理技術検定</h1>
+                <h2>学科試験問題</h2>
+                <p class="year">令和7年度</p>
+            </div>
+
+            <!-- 学習状況サマリー -->
+            <div class="stats-summary">
+                <div class="stats-item">
+                    <span class="stats-label">累計正答率</span>
+                    <span id="overall-rate" class="stats-value">--%</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-label">学習回数</span>
+                    <span id="total-attempts" class="stats-value">0回</span>
+                </div>
+                <div class="stats-item clickable" onclick="showStatsScreen()">
+                    <span class="stats-label">詳細を見る</span>
+                    <span class="stats-value">📊</span>
+                </div>
+            </div>
+
+            <div class="exam-info">
+                <div class="info-card">
+                    <h3>試験概要</h3>
+                    <ul>
+                        <li><strong>午前の部:</strong> 問題1〜44（44問）</li>
+                        <li><strong>午後の部:</strong> 問題45〜50、61〜72（18問）※四肢択一のみ</li>
+                        <li><strong>出題形式:</strong> 四肢択一式</li>
+                        <li><strong>合計:</strong> 62問</li>
+                    </ul>
+                    <p style="font-size: 0.85rem; color: var(--text-light); margin-top: 10px;">
+                        ※問題51〜60（応用能力問題・五肢二択）は除外しています
+                    </p>
+                </div>
+            </div>
+
+            <!-- 復習セクション -->
+            <div class="review-section">
+                <h3>復習学習</h3>
+                <div class="review-buttons">
+                    <button id="review-wrong-btn" class="btn btn-warning" onclick="startWrongReview()">
+                        <span class="btn-icon">🔄</span>
+                        <span class="btn-text">
+                            間違えた問題
+                            <span class="btn-badge" id="wrong-count">0問</span>
+                        </span>
+                    </button>
+                    <button id="study-bookmark-btn" class="btn btn-info" onclick="startBookmarkStudy()">
+                        <span class="btn-icon">⭐</span>
+                        <span class="btn-text">
+                            ブックマーク
+                            <span class="btn-badge" id="bookmark-count">0問</span>
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="mode-selection">
+                <h3>学習モードを選択</h3>
+                <button class="btn btn-primary" onclick="startQuiz('all')">
+                    <span class="btn-icon">📝</span>
+                    全問題（62問）
+                </button>
+                <button class="btn btn-secondary" onclick="startQuiz('am')">
+                    <span class="btn-icon">🌅</span>
+                    午前の部（44問）
+                </button>
+                <button class="btn btn-secondary" onclick="startQuiz('pm')">
+                    <span class="btn-icon">🌆</span>
+                    午後の部（18問）
+                </button>
+                <button class="btn btn-accent" onclick="startQuiz('random')">
+                    <span class="btn-icon">🎲</span>
+                    ランダム20問
+                </button>
+            </div>
+
+            <!-- タイマーモード -->
+            <div class="timer-mode-section">
+                <h3>本番形式（タイマー付き）</h3>
+                <p class="timer-description">制限時間内に解答する本番形式の練習ができます</p>
+                <div class="timer-buttons">
+                    <button class="btn btn-timer" onclick="startTimerMode('all')">
+                        <span class="btn-icon">⏱️</span>
+                        全問題
+                    </button>
+                    <button class="btn btn-timer" onclick="startTimerMode('am')">
+                        <span class="btn-icon">⏱️</span>
+                        午前
+                    </button>
+                    <button class="btn btn-timer" onclick="startTimerMode('pm')">
+                        <span class="btn-icon">⏱️</span>
+                        午後
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- クイズ画面 -->
+        <div id="quiz-screen" class="screen">
+            <div class="quiz-header">
+                <div class="quiz-header-top">
+                    <button class="home-btn" onclick="goHome()" title="トップに戻る">✕</button>
+                    <div id="timer-display" class="timer-display hidden">
+                        <span class="timer-icon">⏱️</span>
+                        <span id="timer-text">00:00</span>
+                    </div>
+                    <button id="bookmark-btn" class="bookmark-btn" onclick="bookmarkCurrentQuestion()" title="ブックマークに追加">
+                        ☆
+                    </button>
+                </div>
+                <div class="progress-info">
+                    <span id="current-num">1</span> / <span id="total-num">62</span>
+                </div>
+                <div class="progress-bar">
+                    <div id="progress" class="progress-fill"></div>
+                </div>
+                <div class="score-info">
+                    正解: <span id="correct-count">0</span>問
+                </div>
+            </div>
+
+            <div class="question-card">
+                <div class="question-number">
+                    〔No. <span id="question-no">1</span>〕
+                </div>
+                <div id="question-text" class="question-text"></div>
+                <div id="choices" class="choices"></div>
+            </div>
+
+            <div id="result-feedback" class="feedback hidden">
+                <div id="feedback-icon" class="feedback-icon"></div>
+                <div id="feedback-text" class="feedback-text"></div>
+                <div id="correct-answer" class="correct-answer"></div>
+            </div>
+
+            <div class="quiz-controls">
+                <button id="next-btn" class="btn btn-primary hidden" onclick="nextQuestion()">
+                    次の問題へ →
+                </button>
+            </div>
+        </div>
+
+        <!-- 結果画面 -->
+        <div id="result-screen" class="screen">
+            <div class="result-header">
+                <h2>試験結果</h2>
+            </div>
+            <div class="result-card">
+                <div class="score-circle">
+                    <span id="final-score">0</span>
+                    <span class="score-label">点</span>
+                </div>
+                <div class="result-details">
+                    <p>正解数: <span id="result-correct">0</span> / <span id="result-total">62</span></p>
+                    <p>正答率: <span id="result-rate">0</span>%</p>
+                    <p class="wrong-count-result">間違い: <span id="wrong-in-session">0</span>問</p>
+                </div>
+                <div id="result-message" class="result-message"></div>
+            </div>
+            <div class="result-actions">
+                <button class="btn btn-primary" onclick="reviewAnswers()">
+                    <span class="btn-icon">📋</span>
+                    解答を確認
+                </button>
+                <button class="btn btn-warning" onclick="startWrongReview()">
+                    <span class="btn-icon">🔄</span>
+                    間違えた問題を復習
+                </button>
+                <button class="btn btn-secondary" onclick="restartQuiz()">
+                    <span class="btn-icon">🔁</span>
+                    もう一度挑戦
+                </button>
+                <button class="btn btn-accent" onclick="goHome()">
+                    <span class="btn-icon">🏠</span>
+                    トップに戻る
+                </button>
+            </div>
+        </div>
+
+        <!-- 解答確認画面 -->
+        <div id="review-screen" class="screen">
+            <div class="review-header">
+                <h2>解答一覧</h2>
+                <button class="btn btn-small" onclick="goToResult()">← 結果に戻る</button>
+            </div>
+            <div class="review-filter">
+                <button class="filter-btn active" onclick="filterReview('all')">全て</button>
+                <button class="filter-btn" onclick="filterReview('wrong')">不正解のみ</button>
+                <button class="filter-btn" onclick="filterReview('correct')">正解のみ</button>
+            </div>
+            <div id="review-list" class="review-list"></div>
+        </div>
+
+        <!-- 統計画面 -->
+        <div id="stats-screen" class="screen">
+            <div class="stats-header">
+                <h2>学習統計</h2>
+                <button class="btn btn-small" onclick="goHome()">← 戻る</button>
+            </div>
+
+            <div class="stats-cards">
+                <div class="stats-card">
+                    <h3>全体統計</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">学習回数</span>
+                            <span id="stats-total-attempts" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">解答問題数</span>
+                            <span id="stats-total-questions" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">正解数</span>
+                            <span id="stats-total-correct" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">累計正答率</span>
+                            <span id="stats-overall-rate" class="stat-value">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats-card">
+                    <h3>苦手な問題 TOP10</h3>
+                    <div id="weak-questions-list" class="weak-list"></div>
+                </div>
+
+                <div class="stats-card">
+                    <h3>学習履歴（直近10回）</h3>
+                    <div id="history-list" class="history-list"></div>
+                </div>
+
+                <div class="stats-card danger-zone">
+                    <h3>データ管理</h3>
+                    <p class="danger-text">学習データをリセットすると、間違い記録・統計・ブックマークが全て削除されます。</p>
+                    <button class="btn btn-danger" onclick="resetAllData()">
+                        <span class="btn-icon">🗑️</span>
+                        データをリセット
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="questions.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
