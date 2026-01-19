@@ -544,19 +544,18 @@
 
             SupabaseService.init();
 
-            // Check session
-            const { data } = await SupabaseService.getSession();
+            // Check if current user is admin
+            const currentUser = localStorage.getItem('quiz_current_user');
 
-            if (!data?.session) {
-                showAuthRequired('ログインが必要です');
+            if (!currentUser) {
+                showAuthRequired('ユーザー名を入力してください');
                 return;
             }
 
-            // Check if admin
-            const { data: profile } = await SupabaseService.getProfile();
+            const isAdmin = await SupabaseService.isAdmin(currentUser);
 
-            if (!profile?.is_admin) {
-                showAuthRequired('管理者権限が必要です');
+            if (!isAdmin) {
+                showAuthRequired('管理者権限が必要です（' + currentUser + '）');
                 return;
             }
 
@@ -645,8 +644,8 @@
                     : '未学習';
 
                 return `
-                    <tr onclick="showUserDetail('${user.user_id}')" style="cursor: pointer;">
-                        <td class="user-name">${escapeHtml(user.display_name)}</td>
+                    <tr onclick="showUserDetail('${user.user_name}')" style="cursor: pointer;">
+                        <td class="user-name">${escapeHtml(user.user_name)}</td>
                         <td>
                             <div class="accuracy">
                                 <div class="accuracy-bar">
@@ -667,20 +666,20 @@
         function filterUsers() {
             const query = document.getElementById('user-search').value.toLowerCase();
             const filtered = allUsers.filter(u =>
-                u.display_name.toLowerCase().includes(query)
+                u.user_name.toLowerCase().includes(query)
             );
             renderUsersTable(filtered);
         }
 
-        async function showUserDetail(userId) {
+        async function showUserDetail(userName) {
             const modal = document.getElementById('user-modal');
             modal.classList.add('active');
 
             // Find user
-            const user = allUsers.find(u => u.user_id === userId);
+            const user = allUsers.find(u => u.user_name === userName);
             if (!user) return;
 
-            document.getElementById('modal-user-name').textContent = user.display_name + ' の学習状況';
+            document.getElementById('modal-user-name').textContent = user.user_name + ' の学習状況';
 
             // Update stats
             document.getElementById('modal-stats').innerHTML = `
@@ -703,7 +702,7 @@
             `;
 
             // Load app-wise data
-            const { data: detail } = await SupabaseService.getUserDetail(userId);
+            const { data: detail } = await SupabaseService.getUserDetail(userName);
 
             if (detail?.appStats) {
                 const appNames = {

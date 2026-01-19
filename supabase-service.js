@@ -1,159 +1,121 @@
 /**
- * Supabase Service
- * Handles all Supabase operations: authentication and data sync
+ * Supabase Service (Simple User Name Based)
+ * No authentication - just user name for identification
  */
 
 const SupabaseService = (function() {
     let client = null;
-    let currentUser = null;
-    let authStateListeners = [];
+    let currentUserName = null;
 
     // =====================================================
     // Initialization
     // =====================================================
 
-    /**
-     * Initialize the service
-     */
     function init() {
         if (!isSupabaseConfigured()) {
             console.warn('Supabase is not configured. Running in offline mode.');
             return false;
         }
-
         client = getSupabaseClient();
-
-        // Listen for auth state changes
-        client.auth.onAuthStateChange((event, session) => {
-            currentUser = session?.user || null;
-            authStateListeners.forEach(listener => listener(event, session));
-        });
-
         return true;
     }
 
-    /**
-     * Add auth state listener
-     */
-    function onAuthStateChange(callback) {
-        authStateListeners.push(callback);
+    function isReady() {
+        return client !== null;
     }
 
     // =====================================================
-    // Authentication
+    // User Management (Simple)
     // =====================================================
 
     /**
-     * Sign up with email and password
+     * Set current user name
      */
-    async function signUp(email, password, displayName) {
-        if (!client) return { error: { message: 'Supabase not initialized' } };
-
-        const { data, error } = await client.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    display_name: displayName
-                }
-            }
-        });
-
-        return { data, error };
+    function setCurrentUser(userName) {
+        currentUserName = userName;
     }
 
     /**
-     * Sign in with email and password
-     */
-    async function signIn(email, password) {
-        if (!client) return { error: { message: 'Supabase not initialized' } };
-
-        const { data, error } = await client.auth.signInWithPassword({
-            email,
-            password
-        });
-
-        return { data, error };
-    }
-
-    /**
-     * Sign out
-     */
-    async function signOut() {
-        if (!client) return { error: { message: 'Supabase not initialized' } };
-
-        const { error } = await client.auth.signOut();
-        currentUser = null;
-        return { error };
-    }
-
-    /**
-     * Get current user
+     * Get current user name
      */
     function getCurrentUser() {
-        return currentUser;
+        return currentUserName;
     }
 
     /**
-     * Get current session
+     * Register or get existing user
      */
-    async function getSession() {
-        if (!client) return { data: { session: null } };
+    async function ensureUser(userName) {
+        if (!client) return { error: { message: 'Not initialized' } };
 
-        const { data, error } = await client.auth.getSession();
-        if (data?.session) {
-            currentUser = data.session.user;
-        }
-        return { data, error };
-    }
-
-    /**
-     * Get user profile
-     */
-    async function getProfile() {
-        if (!client || !currentUser) return { data: null };
-
-        const { data, error } = await client
-            .from('profiles')
-            .select('*')
-            .eq('id', currentUser.id)
+        // Check if user exists
+        const { data: existing } = await client
+            .from('users')
+            .select('user_name')
+            .eq('user_name', userName)
             .single();
 
-        return { data, error };
-    }
+        if (existing) {
+            currentUserName = userName;
+            return { data: existing, isNew: false };
+        }
 
-    /**
-     * Update user profile
-     */
-    async function updateProfile(updates) {
-        if (!client || !currentUser) return { error: { message: 'Not authenticated' } };
-
+        // Create new user
         const { data, error } = await client
-            .from('profiles')
-            .update(updates)
-            .eq('id', currentUser.id)
+            .from('users')
+            .insert({ user_name: userName })
             .select()
             .single();
 
-        return { data, error };
+        if (!error) {
+            currentUserName = userName;
+        }
+
+        return { data, error, isNew: true };
+    }
+
+    /**
+     * Get all users
+     */
+    async function getAllUsers() {
+        if (!client) return { data: [] };
+
+        const { data, error } = await client
+            .from('user_statistics')
+            .select('*')
+            .order('last_active', { ascending: false, nullsFirst: false });
+
+        return { data: data || [], error };
+    }
+
+    /**
+     * Check if user is admin
+     */
+    async function isAdmin(userName) {
+        if (!client) return false;
+
+        const { data } = await client
+            .from('users')
+            .select('is_admin')
+            .eq('user_name', userName)
+            .single();
+
+        return data?.is_admin || false;
     }
 
     // =====================================================
     // Quiz Results
     // =====================================================
 
-    /**
-     * Save quiz result
-     */
     async function saveQuizResult(appId, mode, totalQuestions, correctCount, timeSpent = null) {
-        if (!client || !currentUser) return { error: { message: 'Not authenticated' } };
+        if (!client || !currentUserName) return { error: { message: 'Not ready' } };
 
         const scoreRate = (correctCount / totalQuestions * 100).toFixed(2);
 
         const { data, error } = await client
             .from('quiz_results')
             .insert({
-                user_id: currentUser.id,
+                user_name: currentUserName,
                 app_id: appId,
                 mode: mode,
                 total_questions: totalQuestions,
@@ -167,16 +129,13 @@ const SupabaseService = (function() {
         return { data, error };
     }
 
-    /**
-     * Get quiz history for an app
-     */
     async function getQuizHistory(appId, limit = 10) {
-        if (!client || !currentUser) return { data: [] };
+        if (!client || !currentUserName) return { data: [] };
 
         const { data, error } = await client
             .from('quiz_results')
             .select('*')
-            .eq('user_id', currentUser.id)
+            .eq('user_name', currentUserName)
             .eq('app_id', appId)
             .order('completed_at', { ascending: false })
             .limit(limit);
@@ -184,16 +143,13 @@ const SupabaseService = (function() {
         return { data: data || [], error };
     }
 
-    /**
-     * Get overall statistics
-     */
     async function getOverallStats(appId = null) {
-        if (!client || !currentUser) return { data: null };
+        if (!client || !currentUserName) return { data: null };
 
         let query = client
             .from('quiz_results')
             .select('total_questions, correct_count')
-            .eq('user_id', currentUser.id);
+            .eq('user_name', currentUserName);
 
         if (appId) {
             query = query.eq('app_id', appId);
@@ -203,12 +159,7 @@ const SupabaseService = (function() {
 
         if (!data || data.length === 0) {
             return {
-                data: {
-                    totalQuizzes: 0,
-                    totalQuestions: 0,
-                    totalCorrect: 0,
-                    overallRate: 0
-                }
+                data: { totalQuizzes: 0, totalQuestions: 0, totalCorrect: 0, overallRate: 0 }
             };
         }
 
@@ -230,23 +181,18 @@ const SupabaseService = (function() {
     // Wrong Answers
     // =====================================================
 
-    /**
-     * Save wrong answer
-     */
     async function saveWrongAnswer(appId, questionId) {
-        if (!client || !currentUser) return { error: { message: 'Not authenticated' } };
+        if (!client || !currentUserName) return { error: { message: 'Not ready' } };
 
-        // Check if already exists
         const { data: existing } = await client
             .from('wrong_answers')
             .select('id, wrong_count')
-            .eq('user_id', currentUser.id)
+            .eq('user_name', currentUserName)
             .eq('app_id', appId)
             .eq('question_id', questionId)
             .single();
 
         if (existing) {
-            // Update count
             const { data, error } = await client
                 .from('wrong_answers')
                 .update({
@@ -256,36 +202,28 @@ const SupabaseService = (function() {
                 .eq('id', existing.id)
                 .select()
                 .single();
-
             return { data, error };
         } else {
-            // Insert new
             const { data, error } = await client
                 .from('wrong_answers')
                 .insert({
-                    user_id: currentUser.id,
+                    user_name: currentUserName,
                     app_id: appId,
-                    question_id: questionId,
-                    wrong_count: 1,
-                    last_wrong_at: new Date().toISOString()
+                    question_id: questionId
                 })
                 .select()
                 .single();
-
             return { data, error };
         }
     }
 
-    /**
-     * Record correct answer (decrease wrong count)
-     */
     async function recordCorrectAnswer(appId, questionId) {
-        if (!client || !currentUser) return { error: { message: 'Not authenticated' } };
+        if (!client || !currentUserName) return { error: { message: 'Not ready' } };
 
         const { data: existing } = await client
             .from('wrong_answers')
             .select('id, wrong_count')
-            .eq('user_id', currentUser.id)
+            .eq('user_name', currentUserName)
             .eq('app_id', appId)
             .eq('question_id', questionId)
             .single();
@@ -293,15 +231,9 @@ const SupabaseService = (function() {
         if (!existing) return { data: null };
 
         if (existing.wrong_count <= 1) {
-            // Delete if count reaches 0
-            const { error } = await client
-                .from('wrong_answers')
-                .delete()
-                .eq('id', existing.id);
-
-            return { data: null, error };
+            await client.from('wrong_answers').delete().eq('id', existing.id);
+            return { data: null };
         } else {
-            // Decrease count
             const { data, error } = await client
                 .from('wrong_answers')
                 .update({
@@ -311,26 +243,21 @@ const SupabaseService = (function() {
                 .eq('id', existing.id)
                 .select()
                 .single();
-
             return { data, error };
         }
     }
 
-    /**
-     * Get all wrong answers for an app
-     */
     async function getWrongAnswers(appId) {
-        if (!client || !currentUser) return { data: {} };
+        if (!client || !currentUserName) return { data: {} };
 
         const { data, error } = await client
             .from('wrong_answers')
             .select('question_id, wrong_count, last_wrong_at, last_correct_at')
-            .eq('user_id', currentUser.id)
+            .eq('user_name', currentUserName)
             .eq('app_id', appId);
 
         if (!data) return { data: {}, error };
 
-        // Convert to object format matching LocalStorage structure
         const wrongAnswers = {};
         data.forEach(item => {
             wrongAnswers[item.question_id] = {
@@ -343,92 +270,62 @@ const SupabaseService = (function() {
         return { data: wrongAnswers, error };
     }
 
-    /**
-     * Clear wrong answers
-     */
-    async function clearWrongAnswers(appId) {
-        if (!client || !currentUser) return { error: { message: 'Not authenticated' } };
-
-        const { error } = await client
-            .from('wrong_answers')
-            .delete()
-            .eq('user_id', currentUser.id)
-            .eq('app_id', appId);
-
-        return { error };
-    }
-
     // =====================================================
     // Bookmarks
     // =====================================================
 
-    /**
-     * Add bookmark
-     */
     async function addBookmark(appId, questionId) {
-        if (!client || !currentUser) return { error: { message: 'Not authenticated' } };
+        if (!client || !currentUserName) return { error: { message: 'Not ready' } };
 
         const { data, error } = await client
             .from('bookmarks')
-            .insert({
-                user_id: currentUser.id,
+            .upsert({
+                user_name: currentUserName,
                 app_id: appId,
                 question_id: questionId
-            })
+            }, { onConflict: 'user_name,app_id,question_id' })
             .select()
             .single();
 
         return { data, error };
     }
 
-    /**
-     * Remove bookmark
-     */
     async function removeBookmark(appId, questionId) {
-        if (!client || !currentUser) return { error: { message: 'Not authenticated' } };
+        if (!client || !currentUserName) return { error: { message: 'Not ready' } };
 
         const { error } = await client
             .from('bookmarks')
             .delete()
-            .eq('user_id', currentUser.id)
+            .eq('user_name', currentUserName)
             .eq('app_id', appId)
             .eq('question_id', questionId);
 
         return { error };
     }
 
-    /**
-     * Get all bookmarks for an app
-     */
     async function getBookmarks(appId) {
-        if (!client || !currentUser) return { data: [] };
+        if (!client || !currentUserName) return { data: [] };
 
         const { data, error } = await client
             .from('bookmarks')
             .select('question_id')
-            .eq('user_id', currentUser.id)
+            .eq('user_name', currentUserName)
             .eq('app_id', appId);
 
-        if (!data) return { data: [], error };
-
-        return { data: data.map(b => b.question_id), error };
+        return { data: data ? data.map(b => b.question_id) : [], error };
     }
 
     // =====================================================
     // Adaptive Learning
     // =====================================================
 
-    /**
-     * Update adaptive learning data
-     */
     async function updateAdaptiveLearning(appId, questionId, isCorrect) {
-        if (!client || !currentUser) return { error: { message: 'Not authenticated' } };
+        if (!client || !currentUserName) return { error: { message: 'Not ready' } };
 
-        // Get existing data
         const { data: existing } = await client
             .from('adaptive_learning')
             .select('*')
-            .eq('user_id', currentUser.id)
+            .eq('user_name', currentUserName)
             .eq('app_id', appId)
             .eq('question_id', questionId)
             .single();
@@ -444,7 +341,6 @@ const SupabaseService = (function() {
             if (isCorrect) {
                 updates.consecutive_correct = existing.consecutive_correct + 1;
                 updates.total_correct = existing.total_correct + 1;
-
                 if (updates.consecutive_correct >= 3) {
                     updates.mastered_at = now;
                 }
@@ -462,18 +358,16 @@ const SupabaseService = (function() {
 
             return { data, error };
         } else {
-            // Insert new
             const { data, error } = await client
                 .from('adaptive_learning')
                 .insert({
-                    user_id: currentUser.id,
+                    user_name: currentUserName,
                     app_id: appId,
                     question_id: questionId,
                     consecutive_correct: isCorrect ? 1 : 0,
                     total_correct: isCorrect ? 1 : 0,
                     total_attempts: 1,
-                    last_answered_at: now,
-                    mastered_at: null
+                    last_answered_at: now
                 })
                 .select()
                 .single();
@@ -482,21 +376,17 @@ const SupabaseService = (function() {
         }
     }
 
-    /**
-     * Get adaptive learning data for an app
-     */
     async function getAdaptiveLearning(appId) {
-        if (!client || !currentUser) return { data: {} };
+        if (!client || !currentUserName) return { data: {} };
 
         const { data, error } = await client
             .from('adaptive_learning')
             .select('*')
-            .eq('user_id', currentUser.id)
+            .eq('user_name', currentUserName)
             .eq('app_id', appId);
 
         if (!data) return { data: {}, error };
 
-        // Convert to object format
         const adaptive = {};
         data.forEach(item => {
             adaptive[item.question_id] = {
@@ -515,19 +405,15 @@ const SupabaseService = (function() {
     // Study Time
     // =====================================================
 
-    /**
-     * Record study time
-     */
     async function recordStudyTime(appId, durationSeconds, questionsAnswered) {
-        if (!client || !currentUser) return { error: { message: 'Not authenticated' } };
+        if (!client || !currentUserName) return { error: { message: 'Not ready' } };
 
         const today = new Date().toISOString().split('T')[0];
 
-        // Check if record exists for today
         const { data: existing } = await client
             .from('study_time')
             .select('id, duration_seconds, questions_answered')
-            .eq('user_id', currentUser.id)
+            .eq('user_name', currentUserName)
             .eq('app_id', appId)
             .eq('study_date', today)
             .single();
@@ -542,13 +428,12 @@ const SupabaseService = (function() {
                 .eq('id', existing.id)
                 .select()
                 .single();
-
             return { data, error };
         } else {
             const { data, error } = await client
                 .from('study_time')
                 .insert({
-                    user_id: currentUser.id,
+                    user_name: currentUserName,
                     app_id: appId,
                     study_date: today,
                     duration_seconds: durationSeconds,
@@ -556,16 +441,12 @@ const SupabaseService = (function() {
                 })
                 .select()
                 .single();
-
             return { data, error };
         }
     }
 
-    /**
-     * Get study time history
-     */
     async function getStudyTimeHistory(days = 84) {
-        if (!client || !currentUser) return { data: [] };
+        if (!client || !currentUserName) return { data: [] };
 
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
@@ -573,7 +454,7 @@ const SupabaseService = (function() {
         const { data, error } = await client
             .from('study_time')
             .select('study_date, duration_seconds, questions_answered, app_id')
-            .eq('user_id', currentUser.id)
+            .eq('user_name', currentUserName)
             .gte('study_date', startDate.toISOString().split('T')[0])
             .order('study_date', { ascending: false });
 
@@ -581,61 +462,31 @@ const SupabaseService = (function() {
     }
 
     // =====================================================
-    // Achievements
+    // Admin Functions
     // =====================================================
 
-    /**
-     * Unlock achievement
-     */
-    async function unlockAchievement(achievementId) {
-        if (!client || !currentUser) return { error: { message: 'Not authenticated' } };
+    async function getUserDetail(userName) {
+        if (!client) return { data: null };
 
-        // Check if already unlocked
-        const { data: existing } = await client
-            .from('achievements')
-            .select('id')
-            .eq('user_id', currentUser.id)
-            .eq('achievement_id', achievementId)
-            .single();
+        const { data: appStats } = await client
+            .from('app_statistics')
+            .select('*')
+            .eq('user_name', userName);
 
-        if (existing) return { data: existing, error: null, alreadyUnlocked: true };
-
-        const { data, error } = await client
-            .from('achievements')
-            .insert({
-                user_id: currentUser.id,
-                achievement_id: achievementId
-            })
-            .select()
-            .single();
-
-        return { data, error, alreadyUnlocked: false };
-    }
-
-    /**
-     * Get all achievements
-     */
-    async function getAchievements() {
-        if (!client || !currentUser) return { data: [] };
-
-        const { data, error } = await client
-            .from('achievements')
-            .select('achievement_id, unlocked_at')
-            .eq('user_id', currentUser.id);
-
-        return { data: data || [], error };
+        return {
+            data: {
+                userName,
+                appStats: appStats || []
+            }
+        };
     }
 
     // =====================================================
     // Sync Utilities
     // =====================================================
 
-    /**
-     * Sync local data to Supabase
-     * Used when user logs in to upload existing LocalStorage data
-     */
     async function syncLocalToSupabase(appId, localData) {
-        if (!client || !currentUser) return { error: { message: 'Not authenticated' } };
+        if (!client || !currentUserName) return { success: false };
 
         const results = { success: true, errors: [] };
 
@@ -643,219 +494,80 @@ const SupabaseService = (function() {
             // Sync wrong answers
             if (localData.wrongAnswers) {
                 for (const [qId, data] of Object.entries(localData.wrongAnswers)) {
-                    const { error } = await client
-                        .from('wrong_answers')
-                        .upsert({
-                            user_id: currentUser.id,
+                    if (data.count > 0) {
+                        await client.from('wrong_answers').upsert({
+                            user_name: currentUserName,
                             app_id: appId,
                             question_id: parseInt(qId),
                             wrong_count: data.count,
-                            last_wrong_at: data.lastWrong,
-                            last_correct_at: data.lastCorrect
-                        }, { onConflict: 'user_id,app_id,question_id' });
-
-                    if (error) results.errors.push({ type: 'wrongAnswers', error });
+                            last_wrong_at: data.lastWrong
+                        }, { onConflict: 'user_name,app_id,question_id' });
+                    }
                 }
             }
 
             // Sync bookmarks
             if (localData.bookmarks && localData.bookmarks.length > 0) {
-                const bookmarkInserts = localData.bookmarks.map(qId => ({
-                    user_id: currentUser.id,
-                    app_id: appId,
-                    question_id: qId
-                }));
-
-                const { error } = await client
-                    .from('bookmarks')
-                    .upsert(bookmarkInserts, { onConflict: 'user_id,app_id,question_id' });
-
-                if (error) results.errors.push({ type: 'bookmarks', error });
+                for (const qId of localData.bookmarks) {
+                    await client.from('bookmarks').upsert({
+                        user_name: currentUserName,
+                        app_id: appId,
+                        question_id: qId
+                    }, { onConflict: 'user_name,app_id,question_id' });
+                }
             }
 
             // Sync adaptive learning
             if (localData.adaptiveLearning) {
                 for (const [qId, data] of Object.entries(localData.adaptiveLearning)) {
-                    const { error } = await client
-                        .from('adaptive_learning')
-                        .upsert({
-                            user_id: currentUser.id,
-                            app_id: appId,
-                            question_id: parseInt(qId),
-                            consecutive_correct: data.consecutiveCorrect || 0,
-                            total_correct: data.totalCorrect || 0,
-                            total_attempts: data.totalAttempts || 0,
-                            last_answered_at: data.lastAnswered,
-                            mastered_at: data.masteredAt
-                        }, { onConflict: 'user_id,app_id,question_id' });
-
-                    if (error) results.errors.push({ type: 'adaptiveLearning', error });
+                    await client.from('adaptive_learning').upsert({
+                        user_name: currentUserName,
+                        app_id: appId,
+                        question_id: parseInt(qId),
+                        consecutive_correct: data.consecutiveCorrect || 0,
+                        total_correct: data.totalCorrect || 0,
+                        total_attempts: data.totalAttempts || 0,
+                        last_answered_at: data.lastAnswered,
+                        mastered_at: data.masteredAt
+                    }, { onConflict: 'user_name,app_id,question_id' });
                 }
             }
 
-            // Sync quiz history
-            if (localData.history && localData.history.length > 0) {
-                for (const hist of localData.history) {
-                    const { error } = await client
-                        .from('quiz_results')
-                        .insert({
-                            user_id: currentUser.id,
-                            app_id: appId,
-                            mode: hist.mode || 'unknown',
-                            total_questions: hist.total || 0,
-                            correct_count: hist.correct || 0,
-                            score_rate: hist.rate || 0,
-                            time_spent: hist.timeSpent || null,
-                            completed_at: hist.date || new Date().toISOString()
-                        });
-
-                    if (error && error.code !== '23505') { // Ignore duplicates
-                        results.errors.push({ type: 'history', error });
-                    }
-                }
-            }
-
-            results.success = results.errors.length === 0;
         } catch (e) {
             results.success = false;
-            results.errors.push({ type: 'general', error: e.message });
+            results.errors.push(e.message);
         }
 
         return results;
     }
 
-    /**
-     * Download cloud data to local storage
-     */
-    async function downloadToLocal(appId) {
-        if (!client || !currentUser) return { error: { message: 'Not authenticated' } };
-
-        try {
-            const [wrongAnswers, bookmarks, adaptive, history, stats] = await Promise.all([
-                getWrongAnswers(appId),
-                getBookmarks(appId),
-                getAdaptiveLearning(appId),
-                getQuizHistory(appId, 100),
-                getOverallStats(appId)
-            ]);
-
-            return {
-                data: {
-                    wrongAnswers: wrongAnswers.data,
-                    bookmarks: bookmarks.data,
-                    adaptiveLearning: adaptive.data,
-                    history: history.data,
-                    stats: stats.data
-                }
-            };
-        } catch (e) {
-            return { error: { message: e.message } };
-        }
-    }
-
-    // =====================================================
-    // Admin Functions (for admin users only)
-    // =====================================================
-
-    /**
-     * Get all users (admin only)
-     */
-    async function getAllUsers() {
-        if (!client || !currentUser) return { data: [] };
-
-        const { data, error } = await client
-            .from('user_statistics')
-            .select('*')
-            .order('last_active', { ascending: false, nullsFirst: false });
-
-        return { data: data || [], error };
-    }
-
-    /**
-     * Get user detail (admin only)
-     */
-    async function getUserDetail(userId) {
-        if (!client || !currentUser) return { data: null };
-
-        const { data: profile } = await client
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
-
-        const { data: appStats } = await client
-            .from('app_statistics')
-            .select('*')
-            .eq('user_id', userId);
-
-        const { data: recentActivity } = await client
-            .from('daily_activity')
-            .select('*')
-            .eq('user_id', userId)
-            .limit(30);
-
-        return {
-            data: {
-                profile,
-                appStats: appStats || [],
-                recentActivity: recentActivity || []
-            }
-        };
-    }
-
     // Public API
     return {
         init,
-        onAuthStateChange,
-
-        // Auth
-        signUp,
-        signIn,
-        signOut,
+        isReady,
+        setCurrentUser,
         getCurrentUser,
-        getSession,
-        getProfile,
-        updateProfile,
-
-        // Quiz Results
+        ensureUser,
+        getAllUsers,
+        isAdmin,
         saveQuizResult,
         getQuizHistory,
         getOverallStats,
-
-        // Wrong Answers
         saveWrongAnswer,
         recordCorrectAnswer,
         getWrongAnswers,
-        clearWrongAnswers,
-
-        // Bookmarks
         addBookmark,
         removeBookmark,
         getBookmarks,
-
-        // Adaptive Learning
         updateAdaptiveLearning,
         getAdaptiveLearning,
-
-        // Study Time
         recordStudyTime,
         getStudyTimeHistory,
-
-        // Achievements
-        unlockAchievement,
-        getAchievements,
-
-        // Sync
-        syncLocalToSupabase,
-        downloadToLocal,
-
-        // Admin
-        getAllUsers,
-        getUserDetail
+        getUserDetail,
+        syncLocalToSupabase
     };
 })();
 
-// Export for use in other scripts
 if (typeof window !== 'undefined') {
     window.SupabaseService = SupabaseService;
 }
