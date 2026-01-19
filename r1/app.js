@@ -12,6 +12,7 @@ let mockExamStartTime = null;
 let mockExamType = null; // 'am' or 'pm'
 let isWrongReviewMode = false;  // 復習モードフラグ
 let wrongAnswersData = {};      // 復習時の間違い履歴データ
+let quizStartTime = null;       // クイズ開始時刻
 
 // 本番形式模擬試験の設定
 const MOCK_EXAM_CONFIG = {
@@ -38,7 +39,8 @@ const STORAGE_BASE_KEYS = {
     stats: 'stats_r1',
     bookmarks: 'bookmarks_r1',
     history: 'history_r1',
-    adaptiveLearning: 'adaptive_r1'
+    adaptiveLearning: 'adaptive_r1',
+    studyTime: 'quiz_study_time_r1'
 };
 
 // 適応型学習の設定
@@ -276,6 +278,17 @@ function saveHistory(answers) {
     UserManager.setUserData(STORAGE_BASE_KEYS.history, history);
 }
 
+// 学習時間を取得（秒単位）
+function getTotalStudyTime() {
+    return UserManager.getUserData(STORAGE_BASE_KEYS.studyTime, 0);
+}
+
+// 経過時間を累計学習時間に追加
+function addStudyTime(elapsedSeconds) {
+    const totalTime = getTotalStudyTime();
+    UserManager.setUserData(STORAGE_BASE_KEYS.studyTime, totalTime + elapsedSeconds);
+}
+
 // =====================
 // 画面表示関数
 // =====================
@@ -367,6 +380,7 @@ function startQuiz(mode, withTimer = false) {
     correctCount = 0;
     userAnswers = [];
     isTimerMode = withTimer;
+    quizStartTime = new Date();  // 学習開始時刻を記録
 
     // モードに応じて問題を選択
     switch (mode) {
@@ -816,6 +830,12 @@ function showResult() {
     saveStats(correctCount, total, quizMode);
     saveHistory(userAnswers);
 
+    // 学習時間を計算し保存
+    if (quizStartTime) {
+        const elapsedSeconds = Math.floor((new Date() - quizStartTime) / 1000);
+        addStudyTime(elapsedSeconds);
+    }
+
     document.getElementById('final-score').textContent = correctCount;
     document.getElementById('result-correct').textContent = correctCount;
     document.getElementById('result-total').textContent = total;
@@ -856,6 +876,15 @@ function showResult() {
     // 間違えた問題の数を表示
     const wrongCount = userAnswers.filter(a => !a.isCorrect).length;
     document.getElementById('wrong-in-session').textContent = wrongCount;
+
+    // 学習時間を表示
+    const totalStudyTime = getTotalStudyTime();
+    const hours = Math.floor(totalStudyTime / 3600);
+    const minutes = Math.floor((totalStudyTime % 3600) / 60);
+    const studyTimeEl = document.getElementById('total-study-time');
+    if (studyTimeEl) {
+        studyTimeEl.textContent = `${hours}時間${minutes}分`;
+    }
 
     // 苦手分野分析を表示（問題番号ベース）
     displayWeakAnalysis();
@@ -1363,21 +1392,36 @@ document.addEventListener('keydown', (e) => {
     const choiceButtons = document.querySelectorAll('.choice-btn');
     const isAnswered = choiceButtons.length > 0 && choiceButtons[0].classList.contains('disabled');
 
-    // 1-5キーで回答選択（回答前のみ）
-    if (!isAnswered && ['1', '2', '3', '4', '5'].includes(e.key)) {
+    // 数字キー1-4で選択肢を選択（回答前のみ）
+    if (!isAnswered && ['1', '2', '3', '4'].includes(e.key)) {
+        e.preventDefault();
         const choiceIndex = parseInt(e.key);
         if (choiceIndex <= choiceButtons.length) {
             selectAnswer(choiceIndex);
         }
     }
 
-    // Enterキーまたはスペースキーで次へ（回答後のみ）
-    if (isAnswered && (e.key === 'Enter' || e.key === ' ')) {
+    // 数字キー5で五肢択一の場合のみ5番目の選択肢を選択（回答前のみ）
+    if (!isAnswered && e.key === '5') {
+        e.preventDefault();
+        if (choiceButtons.length >= 5) {
+            selectAnswer(5);
+        }
+    }
+
+    // Enterキーで次の問題へ（回答後のみ）
+    if (isAnswered && e.key === 'Enter') {
         e.preventDefault();
         const nextBtn = document.getElementById('next-btn');
         if (nextBtn && !nextBtn.classList.contains('hidden')) {
             nextBtn.click();
         }
+    }
+
+    // Bキーでブックマーク切り替え
+    if (e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        bookmarkCurrentQuestion();
     }
 });
 

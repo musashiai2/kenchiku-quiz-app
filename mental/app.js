@@ -10,6 +10,7 @@ let isTimerMode = false;
 let selectedSession = null;
 let isWrongReviewMode = false;  // 復習モードフラグ
 let wrongAnswersData = {};      // 復習時の間違い履歴データ
+let quizStartTime = null;       // 学習開始時間
 
 // LocalStorage キー基底 (メンタルヘルス用) - ユーザープレフィックスは UserManager が付与
 const STORAGE_BASE_KEYS = {
@@ -18,7 +19,8 @@ const STORAGE_BASE_KEYS = {
     bookmarks: 'bookmarks_mental',
     history: 'history_mental',
     categoryStats: 'category_stats_mental',
-    adaptiveLearning: 'adaptive_mental'
+    adaptiveLearning: 'adaptive_mental',
+    studyTime: 'quiz_study_time_mental'
 };
 
 // 適応型学習の設定
@@ -298,6 +300,31 @@ function saveHistory(answers) {
         history.shift();
     }
     UserManager.setUserData(STORAGE_BASE_KEYS.history, history);
+}
+
+// =====================
+// 学習時間トラッキング
+// =====================
+
+// 累計学習時間を取得（秒）
+function getTotalStudyTime() {
+    return UserManager.getUserData(STORAGE_BASE_KEYS.studyTime, 0);
+}
+
+// 学習時間を追加（秒）
+function addStudyTime(seconds) {
+    const current = getTotalStudyTime();
+    UserManager.setUserData(STORAGE_BASE_KEYS.studyTime, current + seconds);
+}
+
+// 学習時間をフォーマット表示
+function formatStudyTime(totalSeconds) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    if (hours > 0) {
+        return `${hours}時間${minutes}分`;
+    }
+    return `${minutes}分`;
 }
 
 // =====================
@@ -593,6 +620,7 @@ function startQuiz(mode, withTimer = false) {
     correctCount = 0;
     userAnswers = [];
     isTimerMode = withTimer;
+    quizStartTime = Date.now();  // 学習開始時間を記録
 
     let questions = [...quizData];
 
@@ -1192,6 +1220,13 @@ function showResult() {
     if (timerInterval) {
         clearInterval(timerInterval);
         timerInterval = null;
+    }
+
+    // 学習時間を計算して保存
+    if (quizStartTime) {
+        const elapsedSeconds = Math.floor((Date.now() - quizStartTime) / 1000);
+        addStudyTime(elapsedSeconds);
+        quizStartTime = null;
     }
 
     const total = currentQuestions.length;
