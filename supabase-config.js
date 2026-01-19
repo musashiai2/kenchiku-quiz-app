@@ -10,7 +10,7 @@ const SUPABASE_CONFIG = {
     url: 'https://ueswjzptfhnvzcqkmgbs.supabase.co',
 
     // Supabase anon/public key
-    anonKey: 'sb_publishable_Lx9KSyvFoHxIyKYQUAUVgQ_kVeP61XM'
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlc3dqenB0ZmhudnpjcWttZ2JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4MTM1NDksImV4cCI6MjA4NDM4OTU0OX0.fUoIxNe9ZfGgfSrDo5gIOdVHqORIKR0QjHQ0J59dq9I'
 };
 
 // Initialize Supabase client
