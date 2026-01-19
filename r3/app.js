@@ -900,7 +900,14 @@ document.addEventListener('keydown', (e) => {
     if (!isAnswered && ['1', '2', '3', '4', '5'].includes(e.key)) {
         const choiceIndex = parseInt(e.key);
         if (choiceIndex <= choiceButtons.length) {
-            selectAnswer(choiceIndex);
+            // 現在の問題が五肢二択かどうかチェック
+            const question = currentQuiz[currentIndex];
+            const isMultiSelect = Array.isArray(question.correct);
+            if (isMultiSelect) {
+                toggleMultiSelectAnswer(choiceIndex);
+            } else {
+                selectAnswer(choiceIndex);
+            }
         }
     }
 
