@@ -11,7 +11,9 @@ const STORAGE_KEYS = {
     studied: 'mental_studied',
     difficult: 'mental_difficult',
     bookmarks: 'mental_bookmarks',
-    darkMode: 'quiz_dark_mode'
+    darkMode: 'quiz_dark_mode',
+    lastStudyDate: 'mental_last_study_date',
+    streak: 'mental_streak'
 };
 
 // 初期化
@@ -36,7 +38,7 @@ function generateSessionButtons() {
     const container = document.getElementById('session-buttons');
     if (!container) return;
 
-    const sessions = [...new Set(quizData.map(q => q.session))].sort();
+    const types = [...new Set(quizData.map(q => q.type))].sort();
     container.innerHTML = '';
 
     // 全て選択ボタン
@@ -46,21 +48,21 @@ function generateSessionButtons() {
     allBtn.onclick = () => selectSession(null);
     container.appendChild(allBtn);
 
-    sessions.forEach(session => {
+    types.forEach(type => {
         const btn = document.createElement('button');
         btn.className = 'session-btn';
-        btn.textContent = `分野${session}`;
-        btn.onclick = () => selectSession(session);
+        btn.textContent = type;
+        btn.onclick = () => selectSession(type);
         container.appendChild(btn);
     });
 }
 
-function selectSession(session) {
-    selectedSession = session;
+function selectSession(type) {
+    selectedSession = type;
     document.querySelectorAll('.session-btn').forEach(btn => {
         btn.classList.remove('active');
-        if ((session === null && btn.textContent === '全て') ||
-            (session !== null && btn.textContent === `分野${session}`)) {
+        if ((type === null && btn.textContent === '全て') ||
+            (type !== null && btn.textContent === type)) {
             btn.classList.add('active');
         }
     });
@@ -77,6 +79,7 @@ function markStudied(questionId) {
     if (!studied.includes(questionId)) {
         studied.push(questionId);
         localStorage.setItem(STORAGE_KEYS.studied, JSON.stringify(studied));
+        updateStreak();
     }
 }
 
@@ -116,6 +119,42 @@ function toggleBookmark(questionId) {
     return bookmarks.includes(questionId);
 }
 
+// 学習ストリーク管理
+function getStreak() {
+    return parseInt(localStorage.getItem(STORAGE_KEYS.streak) || '0');
+}
+
+function getLastStudyDate() {
+    return localStorage.getItem(STORAGE_KEYS.lastStudyDate) || '';
+}
+
+function updateStreak() {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const lastDate = getLastStudyDate();
+    let streak = getStreak();
+
+    if (lastDate === today) {
+        // Already studied today
+        return streak;
+    }
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    if (lastDate === yesterdayStr) {
+        // Studied yesterday, increment streak
+        streak++;
+    } else if (lastDate !== today) {
+        // Streak broken, reset to 1
+        streak = 1;
+    }
+
+    localStorage.setItem(STORAGE_KEYS.streak, streak.toString());
+    localStorage.setItem(STORAGE_KEYS.lastStudyDate, today);
+    return streak;
+}
+
 // 表示更新
 function updateStatsDisplay() {
     const studied = getStudied();
@@ -126,6 +165,17 @@ function updateStatsDisplay() {
 
     if (studiedEl) studiedEl.textContent = studied.length + '問';
     if (totalEl) totalEl.textContent = total + '問';
+
+    const percentage = total > 0 ? Math.round((studied.length / total) * 100) : 0;
+    const progressEl = document.getElementById('progress-percentage');
+    if (progressEl) progressEl.textContent = percentage + '%';
+
+    // ストリーク表示を更新
+    const streakEl = document.getElementById('streak-count');
+    if (streakEl) {
+        const streak = getStreak();
+        streakEl.textContent = streak + '日';
+    }
 }
 
 function updateBookmarkButton() {
@@ -171,7 +221,7 @@ function startStudy(mode) {
 
     // セッションフィルタ
     if (selectedSession !== null) {
-        questions = questions.filter(q => q.session === selectedSession);
+        questions = questions.filter(q => q.type === selectedSession);
     }
 
     if (mode === 'random') {
@@ -341,6 +391,42 @@ function showStatsScreen() {
     document.getElementById('stats-easy').textContent = studied.length - difficult.length;
     document.getElementById('stats-difficult').textContent = difficult.length;
 
+    // 分野別進捗を計算
+    const categoryProgress = document.getElementById('category-progress');
+    if (categoryProgress) {
+        const categories = [...new Set(quizData.map(q => q.type))];
+        categoryProgress.innerHTML = '';
+
+        categories.forEach(category => {
+            const categoryQuestions = quizData.filter(q => q.type === category);
+            const studiedInCategory = categoryQuestions.filter(q => studied.includes(q.id)).length;
+            const difficultInCategory = categoryQuestions.filter(q => difficult.includes(q.id)).length;
+            const progressPercent = categoryQuestions.length > 0
+                ? Math.round((studiedInCategory / categoryQuestions.length) * 100)
+                : 0;
+            const accuracyPercent = studiedInCategory > 0
+                ? Math.round(((studiedInCategory - difficultInCategory) / studiedInCategory) * 100)
+                : 0;
+
+            const div = document.createElement('div');
+            div.className = 'category-item';
+            div.innerHTML = `
+                <div class="category-header">
+                    <span class="category-name">${category}</span>
+                    <span class="category-count">${studiedInCategory}/${categoryQuestions.length}</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" style="width: ${progressPercent}%"></div>
+                </div>
+                <div class="category-stats">
+                    <span class="progress-text">進捗: ${progressPercent}%</span>
+                    <span class="accuracy-text ${accuracyPercent < 50 ? 'low-accuracy' : ''}">正答率: ${accuracyPercent}%</span>
+                </div>
+            `;
+            categoryProgress.appendChild(div);
+        });
+    }
+
     // ブックマークリスト
     const bookmarkList = document.getElementById('bookmark-list');
     bookmarkList.innerHTML = '';
@@ -371,6 +457,8 @@ function resetAllData() {
         localStorage.removeItem(STORAGE_KEYS.studied);
         localStorage.removeItem(STORAGE_KEYS.difficult);
         localStorage.removeItem(STORAGE_KEYS.bookmarks);
+        localStorage.removeItem(STORAGE_KEYS.lastStudyDate);
+        localStorage.removeItem(STORAGE_KEYS.streak);
 
         updateStatsDisplay();
         alert('データをリセットしました');
@@ -392,4 +480,74 @@ function shuffleArray(array) {
         [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
     }
     return newArray;
+}
+
+// キーボードショートカット
+document.addEventListener('keydown', (e) => {
+    const studyScreen = document.getElementById('study-screen');
+    if (!studyScreen || !studyScreen.classList.contains('active')) return;
+
+    const answerSection = document.getElementById('answer-section');
+    const isAnswerVisible = answerSection && !answerSection.classList.contains('hidden');
+
+    switch (e.key) {
+        case ' ':
+        case 'Enter':
+            e.preventDefault();
+            if (!isAnswerVisible) {
+                showAnswer();
+            }
+            break;
+        case 'ArrowRight':
+        case 'o':
+        case 'O':
+            e.preventDefault();
+            if (isAnswerVisible) {
+                markEasy();
+            }
+            break;
+        case 'ArrowLeft':
+        case 'x':
+        case 'X':
+            e.preventDefault();
+            if (isAnswerVisible) {
+                markDifficult();
+            }
+            break;
+        case 'b':
+        case 'B':
+            e.preventDefault();
+            toggleBookmarkCurrent();
+            break;
+        case 'Escape':
+            e.preventDefault();
+            goHome();
+            break;
+    }
+});
+
+// 未学習問題のみで学習
+function startUnstudied() {
+    const studied = getStudied();
+    let questions = quizData.filter(q => !studied.includes(q.id));
+
+    if (selectedSession !== null) {
+        questions = questions.filter(q => q.type === selectedSession);
+    }
+
+    if (questions.length === 0) {
+        alert('未学習の問題はありません');
+        return;
+    }
+
+    currentQuestions = shuffleArray(questions);
+    currentIndex = 0;
+    easyCount = 0;
+    difficultCount = 0;
+    studyResults = [];
+
+    document.getElementById('total-num').textContent = currentQuestions.length;
+
+    showQuestion();
+    showScreen('study-screen');
 }

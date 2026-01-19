@@ -20,6 +20,14 @@
 
             <div class="stats-summary">
                 <div class="stats-item">
+                    <span class="stats-label">学習進捗</span>
+                    <span id="progress-percentage" class="stats-value" style="color: var(--secondary-color);">0%</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-label">連続学習</span>
+                    <span id="streak-count" class="stats-value" style="color: var(--warning-color);">0日</span>
+                </div>
+                <div class="stats-item">
                     <span class="stats-label">学習済み</span>
                     <span id="studied-count" class="stats-value">0問</span>
                 </div>
@@ -62,9 +70,22 @@
                 <button class="btn btn-accent" onclick="startStudy('random')">
                     <span class="btn-icon">&#127922;</span>ランダム20問
                 </button>
+                <button class="btn btn-secondary" onclick="startUnstudied()">
+                    <span class="btn-icon">&#128218;</span>未学習のみ
+                </button>
                 <button class="btn btn-warning" onclick="startStudy('bookmarked')">
                     <span class="btn-icon">&#11088;</span>ブックマーク
                 </button>
+            </div>
+
+            <div class="keyboard-hints" style="background: var(--card-bg); border-radius: 12px; padding: 16px; margin-top: 20px; box-shadow: var(--shadow);">
+                <h4 style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 10px;">キーボードショートカット</h4>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.8rem; color: var(--text-light);">
+                    <span><kbd style="background: var(--bg-color); padding: 2px 6px; border-radius: 4px;">Space</kbd> 解答表示</span>
+                    <span><kbd style="background: var(--bg-color); padding: 2px 6px; border-radius: 4px;">&#8594;</kbd> わかった</span>
+                    <span><kbd style="background: var(--bg-color); padding: 2px 6px; border-radius: 4px;">&#8592;</kbd> 難しい</span>
+                    <span><kbd style="background: var(--bg-color); padding: 2px 6px; border-radius: 4px;">B</kbd> ブックマーク</span>
+                </div>
             </div>
 
             <div class="back-link">
@@ -167,6 +188,10 @@
                             <span id="stats-difficult" class="stat-value">0</span>
                         </div>
                     </div>
+                </div>
+                <div class="stats-card">
+                    <h3>分野別進捗</h3>
+                    <div id="category-progress" class="category-progress"></div>
                 </div>
                 <div class="stats-card">
                     <h3>ブックマーク</h3>
