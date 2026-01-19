@@ -103,6 +103,34 @@ const SupabaseService = (function() {
         return data?.is_admin || false;
     }
 
+    /**
+     * Get all user names (simple list)
+     */
+    async function getUserList() {
+        if (!client) return { data: [] };
+
+        const { data, error } = await client
+            .from('users')
+            .select('user_name')
+            .order('created_at', { ascending: true });
+
+        return { data: data ? data.map(u => u.user_name) : [], error };
+    }
+
+    /**
+     * Delete user and all related data
+     */
+    async function deleteUser(userName) {
+        if (!client) return { error: { message: 'Not initialized' } };
+
+        const { error } = await client
+            .from('users')
+            .delete()
+            .eq('user_name', userName);
+
+        return { error };
+    }
+
     // =====================================================
     // Quiz Results
     // =====================================================
@@ -549,6 +577,8 @@ const SupabaseService = (function() {
         getCurrentUser,
         ensureUser,
         getAllUsers,
+        getUserList,
+        deleteUser,
         isAdmin,
         saveQuizResult,
         getQuizHistory,

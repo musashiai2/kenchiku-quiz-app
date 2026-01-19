@@ -1,26 +1,30 @@
 /**
  * Simple User Management UI
- * Save, add, delete user names
+ * User names stored in Supabase (with LocalStorage fallback)
  */
 
 const AuthUI = (function() {
-    const USERS_KEY = 'quiz_users';
     const CURRENT_USER_KEY = 'quiz_current_user';
+    const LOCAL_USERS_KEY = 'quiz_users_local'; // Fallback for offline
     let onUserReadyCallback = null;
+    let cachedUsers = [];
 
     /**
-     * Get saved users list
+     * Get users from Supabase (or LocalStorage fallback)
      */
-    function getUsers() {
-        const data = localStorage.getItem(USERS_KEY);
-        return data ? JSON.parse(data) : [];
-    }
-
-    /**
-     * Save users list
-     */
-    function saveUsers(users) {
-        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    async function getUsers() {
+        if (typeof SupabaseService !== 'undefined' && SupabaseService.isReady()) {
+            const { data, error } = await SupabaseService.getUserList();
+            if (!error && data) {
+                cachedUsers = data;
+                // Also save to local for offline fallback
+                localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(data));
+                return data;
+            }
+        }
+        // Fallback to local storage
+        const localData = localStorage.getItem(LOCAL_USERS_KEY);
+        return localData ? JSON.parse(localData) : [];
     }
 
     /**
@@ -33,7 +37,7 @@ const AuthUI = (function() {
     /**
      * Initialize
      */
-    function init(onUserReady) {
+    async function init(onUserReady) {
         onUserReadyCallback = onUserReady;
 
         // Initialize Supabase
@@ -43,7 +47,7 @@ const AuthUI = (function() {
 
         // Check if user is selected
         const currentUser = getCurrentUser();
-        const users = getUsers();
+        const users = await getUsers();
 
         if (currentUser && users.includes(currentUser)) {
             selectUser(currentUser);
@@ -73,27 +77,45 @@ const AuthUI = (function() {
     /**
      * Add new user
      */
-    function addUser(userName) {
+    async function addUser(userName) {
         const trimmed = userName.trim();
         if (!trimmed) return { success: false, message: 'ユーザー名を入力してください' };
 
-        const users = getUsers();
+        const users = await getUsers();
         if (users.includes(trimmed)) {
             return { success: false, message: 'このユーザー名は既に登録されています' };
         }
 
-        users.push(trimmed);
-        saveUsers(users);
+        // Add to Supabase
+        if (typeof SupabaseService !== 'undefined' && SupabaseService.isReady()) {
+            const { error } = await SupabaseService.ensureUser(trimmed);
+            if (error) {
+                return { success: false, message: 'ユーザーの追加に失敗しました: ' + error.message };
+            }
+        } else {
+            // Fallback: save locally
+            users.push(trimmed);
+            localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
+        }
+
         return { success: true };
     }
 
     /**
      * Delete user
      */
-    function deleteUser(userName) {
-        let users = getUsers();
-        users = users.filter(u => u !== userName);
-        saveUsers(users);
+    async function deleteUser(userName) {
+        if (typeof SupabaseService !== 'undefined' && SupabaseService.isReady()) {
+            const { error } = await SupabaseService.deleteUser(userName);
+            if (error) {
+                return { success: false, message: '削除に失敗しました: ' + error.message };
+            }
+        } else {
+            // Fallback: delete locally
+            let users = await getUsers();
+            users = users.filter(u => u !== userName);
+            localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
+        }
 
         // Clear current user if deleted
         if (getCurrentUser() === userName) {
@@ -106,11 +128,11 @@ const AuthUI = (function() {
     /**
      * Show user selection modal
      */
-    function showUserSelectModal() {
+    async function showUserSelectModal() {
         const existing = document.getElementById('user-select-modal');
         if (existing) existing.remove();
 
-        const users = getUsers();
+        const users = await getUsers();
         const currentUser = getCurrentUser();
 
         const modal = document.createElement('div');
@@ -120,7 +142,7 @@ const AuthUI = (function() {
             <div class="user-select-modal">
                 <div class="user-select-header">
                     <h2>ユーザーを選択</h2>
-                    <p>学習データはユーザーごとに保存されます</p>
+                    <p>学習データはクラウドに保存されます</p>
                 </div>
 
                 <div class="user-list" id="user-list">
@@ -153,16 +175,20 @@ const AuthUI = (function() {
 
         // Event listeners
         const userList = document.getElementById('user-list');
-        userList.addEventListener('click', (e) => {
+        userList.addEventListener('click', async (e) => {
             const deleteBtn = e.target.closest('.user-delete-btn');
             const userItem = e.target.closest('.user-item');
 
             if (deleteBtn) {
                 e.stopPropagation();
                 const userName = deleteBtn.dataset.user;
-                if (confirm(`「${userName}」を削除しますか？`)) {
-                    deleteUser(userName);
-                    refreshUserList();
+                if (confirm(`「${userName}」を削除しますか？\n※このユーザーの学習データも全て削除されます`)) {
+                    const result = await deleteUser(userName);
+                    if (result.success) {
+                        await refreshUserList();
+                    } else {
+                        alert(result.message);
+                    }
                 }
             } else if (userItem) {
                 const userName = userItem.dataset.user;
@@ -174,14 +200,18 @@ const AuthUI = (function() {
         const addBtn = document.getElementById('add-user-btn');
         const input = document.getElementById('new-user-input');
 
-        addBtn.addEventListener('click', () => {
-            const result = addUser(input.value);
+        addBtn.addEventListener('click', async () => {
+            addBtn.disabled = true;
+            addBtn.textContent = '追加中...';
+            const result = await addUser(input.value);
             if (result.success) {
                 input.value = '';
-                refreshUserList();
+                await refreshUserList();
             } else {
                 alert(result.message);
             }
+            addBtn.disabled = false;
+            addBtn.textContent = '追加';
         });
 
         input.addEventListener('keypress', (e) => {
@@ -199,8 +229,8 @@ const AuthUI = (function() {
     /**
      * Refresh user list in modal
      */
-    function refreshUserList() {
-        const users = getUsers();
+    async function refreshUserList() {
+        const users = await getUsers();
         const currentUser = getCurrentUser();
         const userList = document.getElementById('user-list');
 
@@ -396,6 +426,12 @@ const AuthUI = (function() {
             .user-add-btn:hover {
                 transform: translateY(-2px);
                 box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+            }
+
+            .user-add-btn:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+                transform: none;
             }
 
             .user-modal-footer {
