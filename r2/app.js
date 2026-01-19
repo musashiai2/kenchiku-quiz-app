@@ -465,7 +465,7 @@ function selectAnswer(selected) {
         document.getElementById('feedback-icon').textContent = '❌';
         document.getElementById('feedback-text').textContent = '不正解';
         document.getElementById('correct-answer').textContent =
-            `正解は ${question.correct} です`;
+            `正解は ${question.correct !== null && question.correct !== undefined ? question.correct : '(データなし)'} です`;
     }
 
     // 次へボタン表示

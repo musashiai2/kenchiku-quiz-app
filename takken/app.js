@@ -839,7 +839,7 @@ function selectAnswer(selected, isQuizMode = false) {
         document.getElementById('feedback-icon').innerHTML = '&#10005;';
         document.getElementById('feedback-text').textContent = '不正解';
         document.getElementById('correct-answer').textContent =
-            `正解は ${correctAnswer} です`;
+            `正解は ${correctAnswer !== null && correctAnswer !== undefined ? correctAnswer : '(データなし)'} です`;
     }
 
     // 解説を表示

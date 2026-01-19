@@ -230,11 +230,38 @@ body.dark-mode .exam-countdown {
 .stats-item.clickable {
     cursor: pointer;
     transition: all 0.2s ease;
+    border: 2px solid var(--primary-color);
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(37, 99, 235, 0.1) 100%);
+    position: relative;
+}
+
+.stats-item.clickable::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--primary-color);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    border-radius: 10px;
+    pointer-events: none;
 }
 
 .stats-item.clickable:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-lg);
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(37, 99, 235, 0.2) 100%);
+}
+
+.stats-item.clickable:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow);
+}
+
+.stats-item.clickable:active::after {
+    opacity: 0.1;
 }
 
 .stats-label {

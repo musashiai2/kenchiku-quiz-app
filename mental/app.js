@@ -469,7 +469,7 @@ function startTimerMode(mode) {
 // 間違えた問題の復習
 function startWrongReview() {
     const wrong = getWrongAnswers();
-    const wrongIds = Object.keys(wrong);
+    const wrongIds = Object.keys(wrong).map(id => parseInt(id));
 
     if (wrongIds.length === 0) {
         alert('間違えた問題はありません');
@@ -733,7 +733,7 @@ function selectChoice(selectedNumber) {
         feedback.innerHTML = `
             <div class="feedback-icon">&#10005;</div>
             <div class="feedback-text">不正解</div>
-            <div class="correct-answer">正解は ${correctAnswer} です</div>
+            <div class="correct-answer">正解は ${correctAnswer !== null && correctAnswer !== undefined ? correctAnswer : '(データなし)'} です</div>
         `;
         wrongInSession.push(question.id);
         saveWrongAnswer(question.id);
