@@ -1691,6 +1691,10 @@ body.dark-mode .explanation-section.correct-section {
     display: none;
 }
 
+body.dark-mode .explanation {
+    background: #1e293b;
+}
+
 @media (max-width: 600px) {
     .container {
         padding: 12px;

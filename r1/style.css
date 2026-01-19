@@ -824,6 +824,10 @@ body.dark-mode .choice-btn.wrong {
     display: none;
 }
 
+body.dark-mode .explanation {
+    background: #1e293b;
+}
+
 /* クイズコントロール */
 .quiz-controls {
     text-align: center;

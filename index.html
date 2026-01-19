@@ -1779,13 +1779,15 @@
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            // 12週間前の日曜日を取得
-            const startDate = new Date(today);
-            startDate.setDate(today.getDate() - (12 * 7) - today.getDay());
+            // 今週の日曜日を取得し、そこから12週間前の日曜日を開始日とする
+            const thisSunday = new Date(today);
+            thisSunday.setDate(today.getDate() - today.getDay());
+            const startDate = new Date(thisSunday);
+            startDate.setDate(thisSunday.getDate() - (12 * 7));
 
             let currentDate = new Date(startDate);
 
-            // 各週のデータを生成
+            // 各週のデータを生成（過去12週 + 今週 = 13週分）
             for (let week = 0; week < 13; week++) {
                 const weekEl = document.createElement('div');
                 weekEl.className = 'calendar-week';
@@ -1926,7 +1928,7 @@
                 name: '正答率70%',
                 emoji: '📈',
                 description: '全体正答率70%以上',
-                check: (data) => data.totalAccuracy >= 70,
+                check: (data) => data.totalAccuracy !== null && data.totalAccuracy >= 70,
                 progress: (data) => (data.totalAccuracy || 0) + '%/70%'
             },
             {
@@ -1934,7 +1936,7 @@
                 name: '正答率80%',
                 emoji: '🌟',
                 description: '全体正答率80%以上',
-                check: (data) => data.totalAccuracy >= 80,
+                check: (data) => data.totalAccuracy !== null && data.totalAccuracy >= 80,
                 progress: (data) => (data.totalAccuracy || 0) + '%/80%'
             },
             {
@@ -1942,7 +1944,7 @@
                 name: '正答率90%',
                 emoji: '💎',
                 description: '全体正答率90%以上',
-                check: (data) => data.totalAccuracy >= 90,
+                check: (data) => data.totalAccuracy !== null && data.totalAccuracy >= 90,
                 progress: (data) => (data.totalAccuracy || 0) + '%/90%'
             }
         ];

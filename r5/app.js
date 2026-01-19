@@ -1129,6 +1129,61 @@ function startBookmarkStudy() {
     startQuiz('bookmark', false);
 }
 
+// 苦手分野を集中学習
+function startWeakAreaStudy() {
+    const wrongAnswers = getWrongAnswers();
+    const adaptive = getAdaptiveLearning();
+
+    // 苦手問題を特定（間違い記録がある、または正答率が低い問題）
+    const weakQuestions = quizData.filter(q => {
+        // 間違い記録がある問題
+        if (wrongAnswers[q.id] && wrongAnswers[q.id].count > 0) {
+            return true;
+        }
+        // 適応型学習データで正答率が50%未満の問題
+        const adaptiveData = adaptive[q.id];
+        if (adaptiveData && adaptiveData.totalAttempts >= 2) {
+            const accuracy = adaptiveData.totalCorrect / adaptiveData.totalAttempts;
+            if (accuracy < 0.5) {
+                return true;
+            }
+        }
+        return false;
+    });
+
+    if (weakQuestions.length === 0) {
+        alert('苦手な問題がありません。\n学習を続けると、間違えた問題や正答率の低い問題がここに表示されます。');
+        return;
+    }
+
+    // 苦手度でソート（間違い回数が多い順、正答率が低い順）
+    weakQuestions.sort((a, b) => {
+        const aWrong = wrongAnswers[a.id]?.count || 0;
+        const bWrong = wrongAnswers[b.id]?.count || 0;
+        if (aWrong !== bWrong) return bWrong - aWrong;
+
+        const aAdaptive = adaptive[a.id];
+        const bAdaptive = adaptive[b.id];
+        const aAccuracy = aAdaptive ? aAdaptive.totalCorrect / aAdaptive.totalAttempts : 1;
+        const bAccuracy = bAdaptive ? bAdaptive.totalCorrect / bAdaptive.totalAttempts : 1;
+        return aAccuracy - bAccuracy;
+    });
+
+    // 最大30問まで
+    quizMode = 'weak_area';
+    currentIndex = 0;
+    correctCount = 0;
+    userAnswers = [];
+    isTimerMode = false;
+    currentQuiz = shuffleArray(weakQuestions.slice(0, 30));
+
+    document.getElementById('total-num').textContent = currentQuiz.length;
+    document.getElementById('timer-display').classList.add('hidden');
+
+    showScreen('quiz-screen');
+    displayQuestion();
+}
+
 // タイマーモード開始
 function startTimerMode(mode) {
     startQuiz(mode, true);
