@@ -520,6 +520,18 @@ function checkMultiSelectAnswer() {
             `\u6B63\u89E3\u306F ${correctAnswers.join(' \u3068 ')} \u3067\u3059`;
     }
 
+    // 解説表示
+    const explanationEl = document.getElementById('explanation');
+    if (question.explanation) {
+        explanationEl.innerHTML = `
+            <div class="explanation-title">【解説】</div>
+            <div class="explanation-content">${question.explanation}</div>
+        `;
+        explanationEl.classList.remove('hidden');
+    } else {
+        explanationEl.classList.add('hidden');
+    }
+
     // 次へボタン表示
     const nextBtn = document.getElementById('next-btn');
     nextBtn.classList.remove('hidden');
@@ -587,6 +599,18 @@ function selectAnswer(selected) {
         document.getElementById('feedback-text').textContent = '不正解';
         document.getElementById('correct-answer').textContent =
             `正解は ${question.correct !== null && question.correct !== undefined ? question.correct : '(データなし)'} です`;
+    }
+
+    // 解説表示
+    const explanationEl = document.getElementById('explanation');
+    if (question.explanation) {
+        explanationEl.innerHTML = `
+            <div class="explanation-title">【解説】</div>
+            <div class="explanation-content">${question.explanation}</div>
+        `;
+        explanationEl.classList.remove('hidden');
+    } else {
+        explanationEl.classList.add('hidden');
     }
 
     // 次へボタン表示

@@ -469,6 +469,15 @@ function selectAnswer(selected) {
             `正解は ${question.correct !== null && question.correct !== undefined ? question.correct : '(データなし)'} です`;
     }
 
+    // 解説表示
+    const explanationEl = document.getElementById('explanation');
+    if (explanationEl && question.explanation) {
+        explanationEl.innerHTML = `<div class="explanation-label">【解説】</div><div class="explanation-content">${question.explanation.replace(/\n/g, '<br>')}</div>`;
+        explanationEl.classList.remove('hidden');
+    } else if (explanationEl) {
+        explanationEl.classList.add('hidden');
+    }
+
     // 次へボタン表示
     const nextBtn = document.getElementById('next-btn');
     nextBtn.classList.remove('hidden');

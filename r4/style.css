@@ -795,6 +795,37 @@ body.dark-mode .choice-btn.wrong {
     font-size: 0.95rem;
 }
 
+/* 解説表示 */
+.explanation {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--bg-color);
+    border-radius: 12px;
+    text-align: left;
+    border-left: 4px solid var(--primary-color);
+}
+
+.explanation.hidden {
+    display: none;
+}
+
+.explanation-label {
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 8px;
+    font-size: 1rem;
+}
+
+.explanation-content {
+    font-size: 0.9rem;
+    line-height: 1.8;
+    color: var(--text-color);
+}
+
+body.dark-mode .explanation {
+    background: #1e293b;
+}
+
 /* クイズコントロール */
 .quiz-controls {
     text-align: center;
