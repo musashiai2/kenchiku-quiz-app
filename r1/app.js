@@ -19,6 +19,9 @@ const STORAGE_BASE_KEYS = {
 // ダークモードは共通設定
 const DARK_MODE_KEY = 'quiz_dark_mode';
 
+// 試験日カウントダウン用キー（1級建築施工管理技士共通）
+const EXAM_DATE_KEY = 'exam_date_sekoukanri1';
+
 // 初期化
 document.addEventListener('DOMContentLoaded', () => {
     // ユーザー管理の初期化
@@ -42,6 +45,9 @@ function initializeApp() {
     updateStatsDisplay();
     updateWrongCountDisplay();
     updateBookmarkCountDisplay();
+
+    // 試験日カウントダウン初期化
+    initExamCountdown();
 }
 
 // =====================
@@ -243,10 +249,10 @@ function startQuiz(mode, withTimer = false) {
             currentQuiz = [...quizData];
             break;
         case 'am':
-            currentQuiz = quizData.filter(q => q.id <= 44);
+            currentQuiz = quizData.filter(q => q.id <= 50);
             break;
         case 'pm':
-            currentQuiz = quizData.filter(q => q.id > 44);
+            currentQuiz = quizData.filter(q => q.id > 50);
             break;
         case 'random':
             currentQuiz = shuffleArray([...quizData]).slice(0, 20);
@@ -755,6 +761,111 @@ function startTimerMode(mode) {
 function bookmarkCurrentQuestion() {
     const question = currentQuiz[currentIndex];
     toggleBookmark(question.id);
+}
+
+// =====================
+// 試験日カウントダウン機能
+// =====================
+
+// カウントダウン初期化
+function initExamCountdown() {
+    const savedDate = localStorage.getItem(EXAM_DATE_KEY);
+    if (savedDate) {
+        updateCountdownDisplay(savedDate);
+    }
+}
+
+// 試験日を設定
+function setExamDate() {
+    const savedDate = localStorage.getItem(EXAM_DATE_KEY);
+    const defaultDate = savedDate || getDefaultExamDate();
+
+    const input = prompt(
+        '試験日を入力してください (例: 2025-06-08)\n\n' +
+        '【1級建築施工管理技士 試験日目安】\n' +
+        '・一次検定: 6月第2日曜日\n' +
+        '・二次検定: 10月第3日曜日',
+        defaultDate
+    );
+
+    if (input) {
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (dateRegex.test(input)) {
+            const testDate = new Date(input);
+            if (!isNaN(testDate.getTime())) {
+                localStorage.setItem(EXAM_DATE_KEY, input);
+                updateCountdownDisplay(input);
+                return;
+            }
+        }
+        alert('日付の形式が正しくありません。\nYYYY-MM-DD の形式で入力してください。');
+    }
+}
+
+// デフォルトの試験日を取得（次の6月第2日曜日）
+function getDefaultExamDate() {
+    const today = new Date();
+    let year = today.getFullYear();
+
+    // 6月を基準に次の試験日を計算
+    let examDate = getSecondSunday(year, 6);
+
+    // 既に過ぎていたら来年
+    if (examDate < today) {
+        examDate = getSecondSunday(year + 1, 6);
+    }
+
+    return formatDate(examDate);
+}
+
+// 指定月の第2日曜日を取得
+function getSecondSunday(year, month) {
+    const firstDay = new Date(year, month - 1, 1);
+    const firstSunday = 1 + (7 - firstDay.getDay()) % 7;
+    return new Date(year, month - 1, firstSunday + 7);
+}
+
+// 日付をYYYY-MM-DD形式に
+function formatDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+// カウントダウン表示を更新
+function updateCountdownDisplay(dateStr) {
+    const examDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    examDate.setHours(0, 0, 0, 0);
+
+    const diffTime = examDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    const daysEl = document.getElementById('countdown-days');
+    const dateEl = document.getElementById('countdown-date');
+    const countdownEl = document.getElementById('exam-countdown');
+
+    if (daysEl && dateEl && countdownEl) {
+        daysEl.textContent = diffDays;
+
+        // 日付を表示用にフォーマット
+        const displayDate = new Date(dateStr);
+        const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' };
+        dateEl.textContent = displayDate.toLocaleDateString('ja-JP', options);
+
+        // 残り日数に応じてクラスを変更
+        countdownEl.classList.remove('warning', 'urgent', 'passed');
+        if (diffDays < 0) {
+            countdownEl.classList.add('passed');
+            daysEl.textContent = '終了';
+        } else if (diffDays <= 7) {
+            countdownEl.classList.add('urgent');
+        } else if (diffDays <= 30) {
+            countdownEl.classList.add('warning');
+        }
+    }
 }
 
 // キーボードショートカット

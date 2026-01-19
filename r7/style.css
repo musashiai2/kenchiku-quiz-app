@@ -120,6 +120,96 @@ body {
     font-weight: 600;
 }
 
+/* 試験日カウントダウン */
+.exam-countdown {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+    color: white;
+    box-shadow: var(--shadow-lg);
+}
+
+body.dark-mode .exam-countdown {
+    background: linear-gradient(135deg, #4c51bf 0%, #553c9a 100%);
+}
+
+.countdown-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.countdown-icon {
+    font-size: 1.2rem;
+}
+
+.countdown-title {
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.countdown-body {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.countdown-days {
+    font-size: 3rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.countdown-unit {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.countdown-date {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    margin-bottom: 12px;
+}
+
+.countdown-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.countdown-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.exam-countdown.warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.exam-countdown.urgent {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    animation: pulse-countdown 2s infinite;
+}
+
+.exam-countdown.passed {
+    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+}
+
+@keyframes pulse-countdown {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+}
+
 /* 学習状況サマリー */
 .stats-summary {
     display: grid;
@@ -1116,6 +1206,119 @@ body.dark-mode .history-rate.pass {
 
 body.dark-mode .history-rate.fail {
     background: #7f1d1d;
+}
+
+/* 弱点分析セクション */
+.weakness-analysis {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+}
+
+.weakness-analysis h3 {
+    text-align: center;
+    margin-bottom: 16px;
+    color: var(--text-color);
+}
+
+/* 分野別正答率 */
+.category-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.category-item {
+    background: var(--bg-color);
+    border-radius: 12px;
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.category-item:hover {
+    transform: translateX(4px);
+}
+
+.category-item.weak {
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.15) 0%, var(--bg-color) 100%);
+    border-left: 4px solid var(--error-color);
+}
+
+body.dark-mode .category-item.weak {
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.25) 0%, var(--bg-color) 100%);
+}
+
+.category-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.category-name {
+    font-weight: 600;
+    color: var(--text-color);
+    font-size: 0.95rem;
+}
+
+.category-item.weak .category-name {
+    color: var(--error-color);
+}
+
+.category-accuracy {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--primary-color);
+}
+
+.category-item.weak .category-accuracy {
+    color: var(--error-color);
+}
+
+.category-progress-bar {
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.category-progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+}
+
+.category-item.weak .category-progress-fill {
+    background: linear-gradient(90deg, var(--error-color), #f87171);
+}
+
+.category-detail {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--text-light);
+}
+
+.category-count {
+    color: var(--text-light);
+}
+
+.category-weak-badge {
+    color: var(--error-color);
+    font-weight: 600;
+}
+
+.no-data-message {
+    text-align: center;
+    color: var(--text-light);
+    padding: 20px;
+    font-size: 0.9rem;
 }
 
 /* データリセット */

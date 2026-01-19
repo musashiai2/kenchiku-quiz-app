@@ -21,6 +21,20 @@
                 <p class="year">令和2年度</p>
             </div>
 
+            <!-- 試験日カウントダウン -->
+            <div id="exam-countdown" class="exam-countdown">
+                <div class="countdown-header">
+                    <span class="countdown-icon">&#128197;</span>
+                    <span class="countdown-title">試験日まであと</span>
+                </div>
+                <div class="countdown-body">
+                    <span id="countdown-days" class="countdown-days">--</span>
+                    <span class="countdown-unit">日</span>
+                </div>
+                <div class="countdown-date" id="countdown-date">試験日未設定</div>
+                <button class="countdown-btn" onclick="setExamDate()">試験日を設定</button>
+            </div>
+
             <!-- 学習状況サマリー -->
             <div class="stats-summary">
                 <div class="stats-item">
@@ -47,6 +61,18 @@
                         <li><strong>合計:</strong> 82問</li>
                     </ul>
                 </div>
+            </div>
+
+            <!-- 弱点分析セクション -->
+            <div class="weakness-analysis">
+                <h3>弱点分析</h3>
+                <div id="category-stats" class="category-stats">
+                    <!-- 動的に生成 -->
+                </div>
+                <button id="weak-area-study-btn" class="btn btn-danger" onclick="startWeakAreaStudy()" style="margin-top: 16px;">
+                    <span class="btn-icon">&#128293;</span>
+                    苦手分野を集中学習
+                </button>
             </div>
 
             <!-- 復習セクション -->
@@ -243,6 +269,17 @@
                             <span id="stats-overall-rate" class="stat-value">0%</span>
                         </div>
                     </div>
+                </div>
+
+                <div class="stats-card">
+                    <h3>分野別正答率</h3>
+                    <div id="stats-category-analysis" class="category-stats">
+                        <!-- 動的に生成 -->
+                    </div>
+                    <button id="stats-weak-area-btn" class="btn btn-danger" onclick="startWeakAreaStudy()" style="margin-top: 16px;">
+                        <span class="btn-icon">&#128293;</span>
+                        苦手分野を集中学習
+                    </button>
                 </div>
 
                 <div class="stats-card">

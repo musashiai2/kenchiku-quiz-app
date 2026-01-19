@@ -120,6 +120,92 @@ body {
     font-weight: 600;
 }
 
+/* 試験日カウントダウン */
+.exam-countdown {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+    color: white;
+    box-shadow: var(--shadow-lg);
+}
+
+.exam-countdown.warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.exam-countdown.urgent {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    animation: pulse-countdown 2s infinite;
+}
+
+.exam-countdown.passed {
+    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+}
+
+@keyframes pulse-countdown {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+}
+
+.countdown-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.countdown-icon {
+    font-size: 1.2rem;
+}
+
+.countdown-title {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.countdown-body {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 4px;
+}
+
+.countdown-days {
+    font-size: 3rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.countdown-unit {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.countdown-date {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    margin-top: 8px;
+}
+
+.countdown-btn {
+    margin-top: 12px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 20px;
+    color: white;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.countdown-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
 /* 学習状況サマリー */
 .stats-summary {
     display: grid;
@@ -221,6 +307,54 @@ body {
     background: rgba(255, 255, 255, 0.3);
     padding: 2px 8px;
     border-radius: 10px;
+}
+
+/* セッション選択 */
+.session-filter {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+}
+
+.session-filter h3 {
+    text-align: center;
+    margin-bottom: 16px;
+    color: var(--text-color);
+}
+
+.session-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+.session-btn {
+    padding: 10px 20px;
+    background: var(--bg-color);
+    border: 2px solid var(--border-color);
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    color: var(--text-color);
+}
+
+.session-btn:hover {
+    border-color: var(--primary-color);
+    background: #eff6ff;
+}
+
+body.dark-mode .session-btn:hover {
+    background: #1e3a5f;
+}
+
+.session-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
 }
 
 .mode-selection {
@@ -1083,8 +1217,23 @@ body.dark-mode .history-rate.fail {
     background: #7f1d1d;
 }
 
-/* 分野別進捗 */
-.category-progress {
+/* 弱点分析セクション */
+.weakness-analysis {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+}
+
+.weakness-analysis h3 {
+    text-align: center;
+    margin-bottom: 16px;
+    color: var(--text-color);
+}
+
+/* 分野別正答率 */
+.category-stats {
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -1092,24 +1241,99 @@ body.dark-mode .history-rate.fail {
 
 .category-item {
     background: var(--bg-color);
-    border-radius: 8px;
-    padding: 12px;
+    border-radius: 12px;
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease;
 }
 
-.category-header {
+.category-item:hover {
+    transform: translateX(4px);
+}
+
+.category-item.weak {
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.15) 0%, var(--bg-color) 100%);
+    border-left: 4px solid var(--error-color);
+}
+
+body.dark-mode .category-item.weak {
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.25) 0%, var(--bg-color) 100%);
+}
+
+.category-item-header {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     margin-bottom: 8px;
 }
 
 .category-name {
     font-weight: 600;
     color: var(--text-color);
+    font-size: 0.95rem;
+}
+
+.category-item.weak .category-name {
+    color: var(--error-color);
+}
+
+.category-accuracy {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--primary-color);
+}
+
+.category-item.weak .category-accuracy {
+    color: var(--error-color);
+}
+
+.category-progress-bar {
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.category-progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+}
+
+.category-item.weak .category-progress-fill {
+    background: linear-gradient(90deg, var(--error-color), #f87171);
+}
+
+.category-detail {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--text-light);
 }
 
 .category-count {
     color: var(--text-light);
-    font-size: 0.9rem;
+}
+
+.category-weak-badge {
+    color: var(--error-color);
+    font-weight: 600;
+}
+
+/* 分野別進捗 (旧スタイル互換) */
+.category-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.category-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
 }
 
 .progress-bar-container {
@@ -1127,15 +1351,16 @@ body.dark-mode .history-rate.fail {
     transition: width 0.3s ease;
 }
 
-.category-stats {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.8rem;
-    color: var(--text-light);
-}
-
 .low-accuracy {
     color: #ef4444;
+}
+
+/* 苦手分野なし */
+.no-data-message {
+    text-align: center;
+    color: var(--text-light);
+    padding: 20px;
+    font-size: 0.9rem;
 }
 
 /* データリセット */
@@ -1151,6 +1376,100 @@ body.dark-mode .history-rate.fail {
     font-size: 0.9rem;
     color: var(--text-light);
     margin-bottom: 16px;
+}
+
+/* 解答セクション */
+.answer-section {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+}
+
+.answer-header {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-bottom: 12px;
+}
+
+.answer-text {
+    line-height: 1.8;
+    color: var(--text-color);
+}
+
+/* 解説の見やすい表示 */
+.explanation-section {
+    padding: 12px 16px;
+    margin: 8px 0;
+    border-radius: 8px;
+}
+
+.explanation-section.correct-section {
+    background: #dcfce7;
+    border-left: 4px solid var(--success-color);
+}
+
+body.dark-mode .explanation-section.correct-section {
+    background: #14532d;
+}
+
+.explanation-section.explanation-detail {
+    background: var(--bg-color);
+    border-left: 4px solid var(--primary-color);
+}
+
+.section-label {
+    display: inline-block;
+    font-weight: 700;
+    margin-right: 8px;
+}
+
+.section-label.correct-label {
+    color: var(--success-color);
+}
+
+.section-label.explanation-label {
+    color: var(--primary-color);
+}
+
+.correct-answer-text {
+    color: var(--success-color);
+    font-size: 1.1rem;
+}
+
+/* フラッシュカードコントロール */
+.flashcard-controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.flashcard-controls .btn {
+    flex: 1;
+    max-width: 200px;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, var(--success-color), #4ade80);
+    color: white;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* セッションバッジ */
+.session-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: var(--accent-color);
+    color: white;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
 /* レスポンシブ */
