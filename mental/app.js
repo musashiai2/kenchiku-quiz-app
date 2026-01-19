@@ -2,14 +2,14 @@
 let currentQuestions = [];
 let currentIndex = 0;
 let correctCount = 0;
-let wrongInSession = [];
 let userAnswers = [];
-let selectedSession = null;
-let isTimerMode = false;
+let studyMode = 'all';
 let timerInterval = null;
-let remainingTime = 0;
-let currentMode = '';
-let isFlashcardMode = false;
+let timeRemaining = 0;
+let isTimerMode = false;
+let selectedSession = null;
+let isWrongReviewMode = false;  // 復習モードフラグ
+let wrongAnswersData = {};      // 復習時の間違い履歴データ
 
 // LocalStorage キー基底 (メンタルヘルス用) - ユーザープレフィックスは UserManager が付与
 const STORAGE_BASE_KEYS = {
@@ -17,13 +17,23 @@ const STORAGE_BASE_KEYS = {
     stats: 'stats_mental',
     bookmarks: 'bookmarks_mental',
     history: 'history_mental',
-    categoryStats: 'category_stats_mental'
+    categoryStats: 'category_stats_mental',
+    adaptiveLearning: 'adaptive_mental'
+};
+
+// 適応型学習の設定
+const ADAPTIVE_CONFIG = {
+    consecutiveCorrectToMaster: 3,  // 連続正解でマスター判定
+    masterCooldownDays: 7,          // マスター後の出題抑制日数
+    wrongPriorityWeight: 3,         // 間違い問題の優先度重み
+    recentWrongBoost: 2,            // 最近間違えた問題のブースト
+    recentWrongDays: 3              // 「最近」の定義（日数）
 };
 
 // ダークモードは共通設定
 const DARK_MODE_KEY = 'quiz_dark_mode';
 
-// 試験日カウントダウン用キー（メンタルヘルス検定）
+// 試験日カウントダウン用キー（メンタルヘルス）
 const EXAM_DATE_KEY = 'exam_date_mental';
 
 // 初期化
@@ -44,101 +54,192 @@ function initializeApp() {
         updateDarkModeButton();
     }
     updateStatsDisplay();
+    updateWrongCountDisplay();
+    updateBookmarkCountDisplay();
     generateSessionButtons();
-    updateWrongCount();
-    updateBookmarkCount();
     updateCategoryStatsDisplay();
     initExamCountdown();
 }
 
-// セッションボタン生成（分野別 - typeフィールドを使用）
-function generateSessionButtons() {
-    const container = document.getElementById('session-buttons');
-    if (!container) return;
+// =====================
+// データ管理関数
+// =====================
 
-    // type フィールドからユニークな分野を取得
-    const types = [...new Set(quizData.map(q => q.type))].sort();
-    container.innerHTML = '';
-
-    // 全て選択ボタン
-    const allBtn = document.createElement('button');
-    allBtn.className = 'session-btn active';
-    allBtn.textContent = '全て';
-    allBtn.onclick = () => selectSession(null);
-    container.appendChild(allBtn);
-
-    types.forEach(type => {
-        const btn = document.createElement('button');
-        btn.className = 'session-btn';
-        btn.textContent = type;
-        btn.onclick = () => selectSession(type);
-        container.appendChild(btn);
-    });
-}
-
-function selectSession(type) {
-    selectedSession = type;
-    document.querySelectorAll('.session-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if ((type === null && btn.textContent === '全て') ||
-            (type !== null && btn.textContent === type)) {
-            btn.classList.add('active');
-        }
-    });
-}
-
-// データ管理
+// 間違えた問題を取得
 function getWrongAnswers() {
     return UserManager.getUserData(STORAGE_BASE_KEYS.wrongAnswers, {});
 }
 
+// 間違えた問題を保存
 function saveWrongAnswer(questionId) {
-    let wrong = getWrongAnswers();
-    if (!wrong[questionId]) {
-        wrong[questionId] = { count: 0, lastWrong: null };
+    const wrongAnswers = getWrongAnswers();
+    if (!wrongAnswers[questionId]) {
+        wrongAnswers[questionId] = { count: 0, lastWrong: null };
     }
-    wrong[questionId].count++;
-    wrong[questionId].lastWrong = new Date().toISOString();
-    UserManager.setUserData(STORAGE_BASE_KEYS.wrongAnswers, wrong);
+    wrongAnswers[questionId].count++;
+    wrongAnswers[questionId].lastWrong = new Date().toISOString();
+    UserManager.setUserData(STORAGE_BASE_KEYS.wrongAnswers, wrongAnswers);
+
+    // 適応型学習データを更新（間違い）
+    updateAdaptiveLearning(questionId, false);
 }
 
-function removeWrongAnswer(questionId) {
-    let wrong = getWrongAnswers();
-    delete wrong[questionId];
-    UserManager.setUserData(STORAGE_BASE_KEYS.wrongAnswers, wrong);
-}
-
-function getStats() {
-    return UserManager.getUserData(STORAGE_BASE_KEYS.stats, {
-        totalAttempts: 0,
-        totalQuestions: 0,
-        totalCorrect: 0,
-        sessions: []
-    });
-}
-
-function saveStats(correct, total) {
-    let stats = getStats();
-    stats.totalAttempts++;
-    stats.totalQuestions += total;
-    stats.totalCorrect += correct;
-    stats.sessions.push({
-        date: new Date().toISOString(),
-        correct: correct,
-        total: total,
-        mode: currentMode
-    });
-    // 直近100回分のみ保持
-    if (stats.sessions.length > 100) {
-        stats.sessions = stats.sessions.slice(-100);
+// 正解した問題を記録（間違い回数を減らす）
+function recordCorrectAnswer(questionId) {
+    const wrongAnswers = getWrongAnswers();
+    if (wrongAnswers[questionId] && wrongAnswers[questionId].count > 0) {
+        wrongAnswers[questionId].count--;
+        wrongAnswers[questionId].lastCorrect = new Date().toISOString();
+        if (wrongAnswers[questionId].count <= 0) {
+            delete wrongAnswers[questionId];
+        }
+        UserManager.setUserData(STORAGE_BASE_KEYS.wrongAnswers, wrongAnswers);
     }
-    UserManager.setUserData(STORAGE_BASE_KEYS.stats, stats);
+
+    // 適応型学習データを更新
+    updateAdaptiveLearning(questionId, true);
 }
 
+// =====================
+// 適応型学習システム
+// =====================
+
+// 適応型学習データを取得
+function getAdaptiveLearning() {
+    return UserManager.getUserData(STORAGE_BASE_KEYS.adaptiveLearning, {});
+}
+
+// 適応型学習データを更新
+function updateAdaptiveLearning(questionId, isCorrect) {
+    const adaptive = getAdaptiveLearning();
+
+    if (!adaptive[questionId]) {
+        adaptive[questionId] = {
+            consecutiveCorrect: 0,
+            lastAnswered: null,
+            masteredAt: null,
+            totalCorrect: 0,
+            totalAttempts: 0
+        };
+    }
+
+    const data = adaptive[questionId];
+    data.totalAttempts++;
+    data.lastAnswered = new Date().toISOString();
+
+    if (isCorrect) {
+        data.consecutiveCorrect++;
+        data.totalCorrect++;
+
+        // 連続正解でマスター判定
+        if (data.consecutiveCorrect >= ADAPTIVE_CONFIG.consecutiveCorrectToMaster) {
+            data.masteredAt = new Date().toISOString();
+        }
+    } else {
+        // 間違えたら連続正解リセット、マスター解除
+        data.consecutiveCorrect = 0;
+        data.masteredAt = null;
+    }
+
+    UserManager.setUserData(STORAGE_BASE_KEYS.adaptiveLearning, adaptive);
+}
+
+// 問題がマスター済みかチェック（クールダウン期間内）
+function isQuestionMastered(questionId) {
+    const adaptive = getAdaptiveLearning();
+    const data = adaptive[questionId];
+
+    if (!data || !data.masteredAt) return false;
+
+    const masteredDate = new Date(data.masteredAt);
+    const cooldownEnd = new Date(masteredDate);
+    cooldownEnd.setDate(cooldownEnd.getDate() + ADAPTIVE_CONFIG.masterCooldownDays);
+
+    return new Date() < cooldownEnd;
+}
+
+// 問題の優先度スコアを計算
+function calculateQuestionPriority(question) {
+    const wrongAnswers = getWrongAnswers();
+    const adaptive = getAdaptiveLearning();
+    const categoryStats = getCategoryStats();
+
+    let score = 100; // ベーススコア
+
+    const questionId = question.id;
+    const wrongData = wrongAnswers[questionId];
+    const adaptiveData = adaptive[questionId];
+    const category = question.type || '未分類';
+    const catStats = categoryStats[category];
+
+    // 間違い回数による優先度アップ
+    if (wrongData) {
+        score += wrongData.count * ADAPTIVE_CONFIG.wrongPriorityWeight * 10;
+
+        // 最近間違えた問題はさらにブースト
+        if (wrongData.lastWrong) {
+            const daysSinceWrong = (new Date() - new Date(wrongData.lastWrong)) / (1000 * 60 * 60 * 24);
+            if (daysSinceWrong <= ADAPTIVE_CONFIG.recentWrongDays) {
+                score += ADAPTIVE_CONFIG.recentWrongBoost * 20;
+            }
+        }
+    }
+
+    // 苦手分野の問題は優先度アップ
+    if (catStats && catStats.total >= 3) {
+        const accuracy = catStats.correct / catStats.total;
+        if (accuracy < 0.5) {
+            score += (0.5 - accuracy) * 50;
+        }
+    }
+
+    // マスター済みの問題は優先度ダウン
+    if (isQuestionMastered(questionId)) {
+        score -= 80;
+    }
+
+    // 連続正解中の問題は少し優先度ダウン
+    if (adaptiveData && adaptiveData.consecutiveCorrect > 0) {
+        score -= adaptiveData.consecutiveCorrect * 10;
+    }
+
+    // 未回答の問題は少し優先度アップ
+    if (!adaptiveData || adaptiveData.totalAttempts === 0) {
+        score += 20;
+    }
+
+    return score;
+}
+
+// スマート問題選択（適応型学習ベース）
+function selectQuestionsAdaptively(questions, count) {
+    // 優先度スコアを計算
+    const scoredQuestions = questions.map(q => ({
+        question: q,
+        score: calculateQuestionPriority(q),
+        random: Math.random() // ランダム要素を追加
+    }));
+
+    // スコアでソート（高い順）、同点はランダム
+    scoredQuestions.sort((a, b) => {
+        const scoreDiff = b.score - a.score;
+        if (Math.abs(scoreDiff) < 10) {
+            return a.random - b.random;
+        }
+        return scoreDiff;
+    });
+
+    // 上位からcount件を選択し、シャッフル
+    const selected = scoredQuestions.slice(0, count).map(sq => sq.question);
+    return shuffleArray(selected);
+}
+
+// ブックマークを取得
 function getBookmarks() {
     return UserManager.getUserData(STORAGE_BASE_KEYS.bookmarks, []);
 }
 
+// ブックマークを保存
 function toggleBookmark(questionId) {
     let bookmarks = getBookmarks();
     const index = bookmarks.indexOf(questionId);
@@ -148,7 +249,55 @@ function toggleBookmark(questionId) {
         bookmarks.push(questionId);
     }
     UserManager.setUserData(STORAGE_BASE_KEYS.bookmarks, bookmarks);
-    return bookmarks.includes(questionId);
+    updateBookmarkButton(questionId);
+    updateBookmarkCountDisplay();
+}
+
+// 統計データを取得
+function getStats() {
+    return UserManager.getUserData(STORAGE_BASE_KEYS.stats, {
+        totalAttempts: 0,
+        totalQuestions: 0,
+        totalCorrect: 0,
+        sessions: []
+    });
+}
+
+// 統計データを保存
+function saveStats(correct, total, mode) {
+    const stats = getStats();
+    stats.totalAttempts++;
+    stats.totalQuestions += total;
+    stats.totalCorrect += correct;
+    stats.sessions.push({
+        date: new Date().toISOString(),
+        correct: correct,
+        total: total,
+        mode: mode,
+        rate: Math.round((correct / total) * 100)
+    });
+    if (stats.sessions.length > 50) {
+        stats.sessions = stats.sessions.slice(-50);
+    }
+    UserManager.setUserData(STORAGE_BASE_KEYS.stats, stats);
+}
+
+// 履歴を保存
+function saveHistory(answers) {
+    const history = UserManager.getUserData(STORAGE_BASE_KEYS.history, []);
+    history.push({
+        date: new Date().toISOString(),
+        mode: studyMode,
+        answers: answers.map(a => ({
+            questionId: a.questionId,
+            isCorrect: a.isCorrect,
+            userAnswer: a.userAnswer
+        }))
+    });
+    if (history.length > 20) {
+        history.shift();
+    }
+    UserManager.setUserData(STORAGE_BASE_KEYS.history, history);
 }
 
 // =====================
@@ -298,11 +447,10 @@ function startWeakAreaStudy() {
         return;
     }
 
-    currentMode = 'weak_area';
+    studyMode = 'weak_area';
     currentIndex = 0;
     correctCount = 0;
     userAnswers = [];
-    wrongInSession = [];
     isTimerMode = false;
 
     // 苦手分野の問題を集める
@@ -318,269 +466,251 @@ function startWeakAreaStudy() {
     }
 
     document.getElementById('total-num').textContent = currentQuestions.length;
-    const timerDisplay = document.getElementById('timer-display');
-    if (timerDisplay) timerDisplay.classList.add('hidden');
+    document.getElementById('timer-display').classList.add('hidden');
 
     showScreen('quiz-screen');
-    showQuestion();
+    displayQuestion();
 }
 
-// 表示更新
+// =====================
+// 画面表示関数
+// =====================
+
+function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active');
+    });
+    document.getElementById(screenId).classList.add('active');
+
+    if (screenId === 'start-screen') {
+        updateStatsDisplay();
+        updateWrongCountDisplay();
+        updateBookmarkCountDisplay();
+        updateCategoryStatsDisplay();
+    }
+}
+
 function updateStatsDisplay() {
     const stats = getStats();
-    const rate = stats.totalQuestions > 0
-        ? Math.round((stats.totalCorrect / stats.totalQuestions) * 100)
-        : 0;
+    const rateEl = document.getElementById('overall-rate');
+    const attemptsEl = document.getElementById('total-attempts');
 
-    const overallRateEl = document.getElementById('overall-rate');
-    const totalAttemptsEl = document.getElementById('total-attempts');
+    if (rateEl && stats.totalQuestions > 0) {
+        rateEl.textContent = Math.round((stats.totalCorrect / stats.totalQuestions) * 100) + '%';
+    } else if (rateEl) {
+        rateEl.textContent = '--%';
+    }
 
-    if (overallRateEl) overallRateEl.textContent = stats.totalQuestions > 0 ? rate + '%' : '--%';
-    if (totalAttemptsEl) totalAttemptsEl.textContent = stats.totalAttempts + '回';
+    if (attemptsEl) {
+        attemptsEl.textContent = stats.totalAttempts + '回';
+    }
 }
 
-function updateWrongCount() {
-    const wrong = getWrongAnswers();
-    const count = Object.keys(wrong).length;
+function updateWrongCountDisplay() {
+    const wrongAnswers = getWrongAnswers();
+    const count = Object.keys(wrongAnswers).length;
     const el = document.getElementById('wrong-count');
-    if (el) el.textContent = count + '問';
+    if (el) {
+        el.textContent = count + '問';
+    }
 
-    const btn = document.getElementById('review-wrong-btn');
-    if (btn) btn.disabled = count === 0;
+    const reviewBtn = document.getElementById('review-wrong-btn');
+    if (reviewBtn) {
+        reviewBtn.disabled = count === 0;
+        reviewBtn.style.opacity = count === 0 ? '0.5' : '1';
+    }
 }
 
-function updateBookmarkCount() {
+function updateBookmarkCountDisplay() {
     const bookmarks = getBookmarks();
     const el = document.getElementById('bookmark-count');
-    if (el) el.textContent = bookmarks.length + '問';
+    if (el) {
+        el.textContent = bookmarks.length + '問';
+    }
 
-    const btn = document.getElementById('study-bookmark-btn');
-    if (btn) btn.disabled = bookmarks.length === 0;
+    const bookmarkBtn = document.getElementById('study-bookmark-btn');
+    if (bookmarkBtn) {
+        bookmarkBtn.disabled = bookmarks.length === 0;
+        bookmarkBtn.style.opacity = bookmarks.length === 0 ? '0.5' : '1';
+    }
 }
 
-function updateBookmarkButton() {
-    const question = currentQuestions[currentIndex];
-    if (!question) return;
-
+function updateBookmarkButton(questionId) {
     const bookmarks = getBookmarks();
     const btn = document.getElementById('bookmark-btn');
     if (btn) {
-        const isBookmarked = bookmarks.includes(question.id);
+        const isBookmarked = bookmarks.includes(questionId);
         btn.innerHTML = isBookmarked ? '&#9733;' : '&#9734;';
         btn.classList.toggle('active', isBookmarked);
+        btn.title = isBookmarked ? 'ブックマーク解除' : 'ブックマークに追加';
     }
 }
 
-// ダークモード
-function toggleDarkMode() {
-    document.body.classList.toggle('dark-mode');
-    const isDark = document.body.classList.contains('dark-mode');
-    localStorage.setItem(DARK_MODE_KEY, isDark);
-    updateDarkModeButton();
+// =====================
+// セッション（分野）選択
+// =====================
+
+function generateSessionButtons() {
+    const container = document.getElementById('session-buttons');
+    if (!container) return;
+
+    const types = [...new Set(quizData.map(q => q.type))].sort();
+    container.innerHTML = '';
+
+    const allBtn = document.createElement('button');
+    allBtn.className = 'session-btn active';
+    allBtn.textContent = '全て';
+    allBtn.onclick = () => selectSession(null);
+    container.appendChild(allBtn);
+
+    types.forEach(type => {
+        const btn = document.createElement('button');
+        btn.className = 'session-btn';
+        btn.textContent = type;
+        btn.onclick = () => selectSession(type);
+        container.appendChild(btn);
+    });
 }
 
-function updateDarkModeButton() {
-    const btn = document.getElementById('dark-mode-btn');
-    const isDark = document.body.classList.contains('dark-mode');
-    if (btn) {
-        btn.innerHTML = isDark ? '&#9788;' : '&#127769;';
-        btn.title = isDark ? 'ライトモード' : 'ダークモード';
-    }
+function selectSession(type) {
+    selectedSession = type;
+    document.querySelectorAll('.session-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if ((type === null && btn.textContent === '全て') ||
+            (type !== null && btn.textContent === type)) {
+            btn.classList.add('active');
+        }
+    });
 }
 
-// 画面遷移
-function showScreen(screenId) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    const screen = document.getElementById(screenId);
-    if (screen) screen.classList.add('active');
-}
+// =====================
+// クイズ機能
+// =====================
 
-// クイズ開始
-function startQuiz(mode) {
-    currentMode = mode;
-    isTimerMode = false;
-    isFlashcardMode = false;
-    let questions = [...quizData];
-
-    // 分野フィルタ
-    if (selectedSession !== null) {
-        questions = questions.filter(q => q.type === selectedSession);
-    }
-
-    if (mode === 'random') {
-        questions = shuffleArray(questions).slice(0, 20);
-    }
-
-    if (questions.length === 0) {
-        alert('該当する問題がありません');
-        return;
-    }
-
-    currentQuestions = questions;
+function startQuiz(mode, withTimer = false) {
+    studyMode = mode;
     currentIndex = 0;
     correctCount = 0;
-    wrongInSession = [];
     userAnswers = [];
+    isTimerMode = withTimer;
 
-    document.getElementById('total-num').textContent = currentQuestions.length;
-    document.getElementById('timer-display').classList.add('hidden');
-
-    showQuestion();
-    showScreen('quiz-screen');
-}
-
-// タイマーモード開始
-function startTimerMode(mode) {
-    currentMode = 'timer-' + mode;
-    isTimerMode = true;
-    isFlashcardMode = false;
     let questions = [...quizData];
 
     if (selectedSession !== null) {
         questions = questions.filter(q => q.type === selectedSession);
     }
 
-    if (mode === 'random') {
-        questions = shuffleArray(questions).slice(0, 20);
+    switch (mode) {
+        case 'all':
+            // 全問題モードでもシャッフル
+            currentQuestions = shuffleArray(questions);
+            break;
+        case 'random':
+            // 適応型学習で賢く選択
+            currentQuestions = selectQuestionsAdaptively(questions, 20);
+            break;
+        case 'smart':
+            // スマート学習モード（苦手問題優先）
+            currentQuestions = selectQuestionsAdaptively(questions, Math.min(30, questions.length));
+            break;
+        case 'wrong':
+            const wrongAnswers = getWrongAnswers();
+            const wrongIds = Object.keys(wrongAnswers).map(id => parseInt(id));
+            currentQuestions = questions.filter(q => wrongIds.includes(q.id));
+            // 間違い回数が多い順 + 最近間違えた順でソート後シャッフル
+            currentQuestions.sort((a, b) => {
+                const countDiff = (wrongAnswers[b.id]?.count || 0) - (wrongAnswers[a.id]?.count || 0);
+                if (countDiff !== 0) return countDiff;
+                // 同じ回数なら最近間違えた順
+                const aDate = wrongAnswers[a.id]?.lastWrong ? new Date(wrongAnswers[a.id].lastWrong) : new Date(0);
+                const bDate = wrongAnswers[b.id]?.lastWrong ? new Date(wrongAnswers[b.id].lastWrong) : new Date(0);
+                return bDate - aDate;
+            });
+            // 上位50%をシャッフル（順番を少し変える）
+            const halfLength = Math.ceil(currentQuestions.length / 2);
+            const topHalf = shuffleArray(currentQuestions.slice(0, halfLength));
+            const bottomHalf = currentQuestions.slice(halfLength);
+            currentQuestions = [...topHalf, ...bottomHalf];
+            break;
+        case 'bookmark':
+            const bookmarks = getBookmarks();
+            currentQuestions = questions.filter(q => bookmarks.includes(q.id));
+            currentQuestions = shuffleArray(currentQuestions);
+            break;
     }
 
-    if (questions.length === 0) {
+    if (currentQuestions.length === 0) {
         alert('該当する問題がありません');
         return;
     }
 
-    currentQuestions = questions;
-    currentIndex = 0;
-    correctCount = 0;
-    wrongInSession = [];
-    userAnswers = [];
-
-    // タイマー設定（1問あたり90秒）
-    remainingTime = currentQuestions.length * 90;
-
     document.getElementById('total-num').textContent = currentQuestions.length;
-    document.getElementById('timer-display').classList.remove('hidden');
 
-    startTimer();
-    showQuestion();
+    if (isTimerMode) {
+        timeRemaining = currentQuestions.length * 120;
+        document.getElementById('timer-display').classList.remove('hidden');
+        startTimer();
+    } else {
+        document.getElementById('timer-display').classList.add('hidden');
+    }
+
     showScreen('quiz-screen');
+    displayQuestion();
 }
 
-// 間違えた問題の復習
-function startWrongReview() {
-    const wrong = getWrongAnswers();
-    const wrongIds = Object.keys(wrong).map(id => parseInt(id));
-
-    if (wrongIds.length === 0) {
-        alert('間違えた問題はありません');
-        return;
-    }
-
-    currentMode = 'wrong-review';
-    isTimerMode = false;
-    isFlashcardMode = false;
-    let questions = quizData.filter(q => wrongIds.includes(q.id));
-
-    if (selectedSession !== null) {
-        questions = questions.filter(q => q.type === selectedSession);
-    }
-
-    if (questions.length === 0) {
-        alert('選択した分野に間違えた問題はありません');
-        return;
-    }
-
-    currentQuestions = shuffleArray(questions);
-    currentIndex = 0;
-    correctCount = 0;
-    wrongInSession = [];
-    userAnswers = [];
-
-    document.getElementById('total-num').textContent = currentQuestions.length;
-    document.getElementById('timer-display').classList.add('hidden');
-
-    showQuestion();
-    showScreen('quiz-screen');
+function startStudy(mode) {
+    startQuiz(mode, false);
 }
 
-// ブックマーク学習
-function startBookmarkStudy() {
-    const bookmarks = getBookmarks();
-
-    if (bookmarks.length === 0) {
-        alert('ブックマークされた問題はありません');
-        return;
-    }
-
-    currentMode = 'bookmark';
-    isTimerMode = false;
-    isFlashcardMode = true;
-    let questions = quizData.filter(q => bookmarks.includes(q.id));
-
-    if (selectedSession !== null) {
-        questions = questions.filter(q => q.type === selectedSession);
-    }
-
-    if (questions.length === 0) {
-        alert('選択した分野にブックマークされた問題はありません');
-        return;
-    }
-
-    currentQuestions = shuffleArray(questions);
-    currentIndex = 0;
-    correctCount = 0;
-    wrongInSession = [];
-    userAnswers = [];
-
-    document.getElementById('total-num').textContent = currentQuestions.length;
-    document.getElementById('timer-display').classList.add('hidden');
-
-    showQuestion();
-    showScreen('quiz-screen');
-}
-
-// タイマー管理
 function startTimer() {
     updateTimerDisplay();
     timerInterval = setInterval(() => {
-        remainingTime--;
+        timeRemaining--;
         updateTimerDisplay();
-
-        if (remainingTime <= 0) {
+        if (timeRemaining <= 0) {
             clearInterval(timerInterval);
-            finishQuiz();
+            alert('時間切れです！');
+            showResult();
         }
     }, 1000);
 }
 
 function updateTimerDisplay() {
-    const minutes = Math.floor(remainingTime / 60);
-    const seconds = remainingTime % 60;
-    const display = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    const hours = Math.floor(timeRemaining / 3600);
+    const minutes = Math.floor((timeRemaining % 3600) / 60);
+    const seconds = timeRemaining % 60;
+
+    let display = '';
+    if (hours > 0) {
+        display = `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    } else {
+        display = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
     document.getElementById('timer-text').textContent = display;
 
     const timerDisplay = document.getElementById('timer-display');
-    if (remainingTime <= 60) {
+    if (timeRemaining <= 60) {
         timerDisplay.classList.add('warning');
     } else {
         timerDisplay.classList.remove('warning');
     }
 }
 
-function stopTimer() {
-    if (timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
+function shuffleArray(array) {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
     }
+    return newArray;
 }
 
-// 4択問題かどうかを判定
 function isMultipleChoiceQuestion(questionText) {
     const pattern = /\n[1-4]\.\s/;
     return pattern.test(questionText);
 }
 
-// 4択問題のテキストと選択肢を分離
 function parseMultipleChoiceQuestion(questionText) {
     const firstChoiceMatch = questionText.match(/\n1\.\s/);
     if (!firstChoiceMatch) {
@@ -606,10 +736,9 @@ function parseMultipleChoiceQuestion(questionText) {
     return { questionBody, choices };
 }
 
-// 正解番号を抽出
 function extractCorrectAnswer(answerText) {
     const patterns = [
-        /【正解】(\d)/,
+        /【正解】\s*(\d)/,
         /正解[：:]\s*(\d)/,
         /答え[：:]\s*(\d)/,
         /解答[：:]\s*(\d)/,
@@ -627,122 +756,390 @@ function extractCorrectAnswer(answerText) {
     return null;
 }
 
-// 問題表示
-function showQuestion() {
+function formatText(text) {
+    if (!text) return '';
+    return text
+        .replace(/\n/g, '<br>')
+        .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
+}
+
+function formatExplanation(text) {
+    if (!text) return '';
+
+    let formatted = text;
+
+    formatted = formatted.replace(/【正解】/g, '<div class="explanation-section correct-section"><span class="section-label correct-label">【正解】</span>');
+    formatted = formatted.replace(/【解説】/g, '</div><div class="explanation-section explanation-detail"><span class="section-label explanation-label">【解説】</span>');
+    formatted = formatted.replace(/正解[：:]\s*(\d)/g, '<strong class="correct-answer-text">正解: $1</strong>');
+
+    formatted = formatted
+        .replace(/\n/g, '<br>')
+        .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
+
+    if (formatted.includes('explanation-section') && !formatted.endsWith('</div>')) {
+        formatted += '</div>';
+    }
+
+    return formatted;
+}
+
+// =====================
+// 復習モード強化機能
+// =====================
+
+function displayWrongReviewBadge(question) {
+    const existingBadge = document.getElementById('wrong-review-badge');
+    if (existingBadge) existingBadge.remove();
+    const existingHint = document.getElementById('review-hint');
+    if (existingHint) existingHint.remove();
+
+    if (!isWrongReviewMode) return;
+
+    const wrongData = wrongAnswersData[question.id];
+    if (!wrongData) return;
+
+    const badge = document.createElement('div');
+    badge.id = 'wrong-review-badge';
+    badge.className = 'wrong-review-badge';
+
+    const wrongCount = wrongData.count || 0;
+    let urgencyClass = '', urgencyText = '';
+
+    if (wrongCount >= 3) { urgencyClass = 'high-priority'; urgencyText = '要注意'; }
+    else if (wrongCount >= 2) { urgencyClass = 'medium-priority'; urgencyText = '復習推奨'; }
+    else { urgencyClass = 'low-priority'; urgencyText = '確認'; }
+
+    badge.classList.add(urgencyClass);
+    badge.innerHTML = `<span class="badge-icon">&#128270;</span><span class="badge-text">${urgencyText}: ${wrongCount}回間違い</span>`;
+
+    const questionHeader = document.querySelector('.question-header') || document.querySelector('.quiz-header');
+    if (questionHeader) questionHeader.appendChild(badge);
+
+    displayReviewHint(question, wrongData);
+}
+
+function displayReviewHint(question, wrongData) {
+    const hintContainer = document.createElement('div');
+    hintContainer.id = 'review-hint';
+    hintContainer.className = 'review-hint';
+
+    const wrongCount = wrongData.count || 0;
+    const lastWrong = wrongData.lastWrong ? new Date(wrongData.lastWrong) : null;
+
+    let hintText = '', tipsList = [];
+
+    if (wrongCount >= 3) {
+        hintText = 'この問題は複数回間違えています。';
+        tipsList.push('解説をよく読んで、なぜ間違えたか考えましょう');
+        tipsList.push('選択肢の違いを明確に理解することが重要です');
+    } else if (wrongCount >= 2) {
+        hintText = 'この問題は以前も間違えています。';
+        tipsList.push('前回の間違いを思い出して慎重に解答しましょう');
+    } else {
+        hintText = 'この問題で一度間違えています。';
+        tipsList.push('落ち着いて問題文を読みましょう');
+    }
+
+    let lastWrongText = '';
+    if (lastWrong) {
+        const diffDays = Math.floor((new Date() - lastWrong) / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) lastWrongText = '今日間違えました';
+        else if (diffDays === 1) lastWrongText = '昨日間違えました';
+        else if (diffDays < 7) lastWrongText = `${diffDays}日前に間違えました`;
+        else lastWrongText = `${Math.floor(diffDays / 7)}週間前に間違えました`;
+    }
+
+    hintContainer.innerHTML = `
+        <div class="hint-header"><span class="hint-icon">&#128161;</span><span class="hint-title">復習ポイント</span></div>
+        <div class="hint-content">
+            <p class="hint-message">${hintText}</p>
+            ${lastWrongText ? `<p class="hint-last-wrong">${lastWrongText}</p>` : ''}
+            <ul class="hint-tips">${tipsList.map(tip => `<li>${tip}</li>`).join('')}</ul>
+        </div>
+    `;
+
+    const questionText = document.getElementById('question-text');
+    if (questionText && questionText.parentNode) questionText.parentNode.insertBefore(hintContainer, questionText);
+}
+
+function generateReviewAnalysis() {
+    if (!isWrongReviewMode || userAnswers.length === 0) return null;
+
+    const analysis = { totalReviewed: userAnswers.length, improved: 0, stillWrong: 0, frequentWrong: [], categoryAnalysis: {}, recommendations: [] };
+
+    userAnswers.forEach(answer => {
+        const question = currentQuestions.find(q => q.id === answer.questionId);
+        if (!question) return;
+        const category = question.type || '未分類';
+        if (!analysis.categoryAnalysis[category]) analysis.categoryAnalysis[category] = { correct: 0, wrong: 0 };
+
+        if (answer.isCorrect) {
+            analysis.improved++;
+            analysis.categoryAnalysis[category].correct++;
+        } else {
+            analysis.stillWrong++;
+            analysis.categoryAnalysis[category].wrong++;
+            const wrongData = wrongAnswersData[answer.questionId];
+            if (wrongData && wrongData.count >= 3) analysis.frequentWrong.push({ id: answer.questionId, count: wrongData.count, category });
+        }
+    });
+
+    const improvementRate = Math.round((analysis.improved / analysis.totalReviewed) * 100);
+    if (improvementRate >= 80) analysis.recommendations.push('素晴らしい改善です！この調子で学習を続けましょう。');
+    else if (improvementRate >= 60) analysis.recommendations.push('良い進歩です。まだ間違える問題は重点的に復習しましょう。');
+    else if (improvementRate >= 40) analysis.recommendations.push('まだ改善の余地があります。解説をよく読んで理解を深めましょう。');
+    else analysis.recommendations.push('基礎からの復習が必要かもしれません。教科書も併せて確認しましょう。');
+
+    const weakCategories = Object.entries(analysis.categoryAnalysis).filter(([_, s]) => s.wrong > s.correct).map(([n]) => n);
+    if (weakCategories.length > 0) analysis.recommendations.push(`特に「${weakCategories.join('」「')}」の分野を重点的に学習しましょう。`);
+    if (analysis.frequentWrong.length > 0) analysis.recommendations.push(`問題${analysis.frequentWrong.map(q => q.id).join(', ')}は何度も間違えています。`);
+
+    return analysis;
+}
+
+function displayReviewAnalysis() {
+    const analysis = generateReviewAnalysis();
+    if (!analysis) return;
+
+    const container = document.getElementById('result-weak-analysis');
+    if (!container) return;
+
+    const improvementRate = Math.round((analysis.improved / analysis.totalReviewed) * 100);
+    const analysisHTML = `
+        <div class="review-analysis">
+            <div class="analysis-header"><span class="analysis-icon">&#128200;</span><span class="analysis-title">復習結果の分析</span></div>
+            <div class="analysis-summary">
+                <div class="summary-item improvement"><span class="summary-label">改善率</span><span class="summary-value ${improvementRate >= 70 ? 'good' : improvementRate >= 50 ? 'moderate' : 'needs-work'}">${improvementRate}%</span></div>
+                <div class="summary-item"><span class="summary-label">正解（改善）</span><span class="summary-value">${analysis.improved}問</span></div>
+                <div class="summary-item"><span class="summary-label">不正解（要継続）</span><span class="summary-value">${analysis.stillWrong}問</span></div>
+            </div>
+            ${analysis.frequentWrong.length > 0 ? `<div class="frequent-wrong-section"><div class="section-header"><span class="warning-icon">&#9888;</span><span>繰り返し間違える問題</span></div><ul class="frequent-wrong-list">${analysis.frequentWrong.map(q => `<li>問題 ${q.id}（${q.category}）- ${q.count}回間違い</li>`).join('')}</ul></div>` : ''}
+            <div class="recommendations-section"><div class="section-header"><span class="bulb-icon">&#128161;</span><span>学習アドバイス</span></div><ul class="recommendations-list">${analysis.recommendations.map(rec => `<li>${rec}</li>`).join('')}</ul></div>
+        </div>
+    `;
+    container.insertAdjacentHTML('afterbegin', analysisHTML);
+}
+
+// 現在の問題の選択肢マッピング（シャッフル対応）
+let currentChoiceMapping = [];
+
+function displayQuestion() {
     const question = currentQuestions[currentIndex];
 
     document.getElementById('current-num').textContent = currentIndex + 1;
-    document.getElementById('question-no').textContent = question.questionNo || (currentIndex + 1);
-    document.getElementById('session-badge').textContent = question.type || '問題';
+    document.getElementById('question-no').textContent = question.questionNo || question.id;
     document.getElementById('correct-count').textContent = correctCount;
+
+    const progress = ((currentIndex) / currentQuestions.length) * 100;
+    document.getElementById('progress').style.width = progress + '%';
+
+    updateBookmarkButton(question.id);
 
     const questionText = document.getElementById('question-text');
     const choicesContainer = document.getElementById('choices');
 
-    // 4択問題かどうか判定
-    if (isMultipleChoiceQuestion(question.question) && !isFlashcardMode) {
+    const sessionBadge = document.getElementById('session-badge');
+    if (sessionBadge) {
+        sessionBadge.textContent = question.type || '問題';
+    }
+
+    // 復習モード時の間違い回数バッジ表示
+    displayWrongReviewBadge(question);
+
+    if (isMultipleChoiceQuestion(question.question)) {
         const parsed = parseMultipleChoiceQuestion(question.question);
         questionText.innerHTML = formatText(parsed.questionBody);
 
         choicesContainer.innerHTML = '';
         choicesContainer.classList.remove('hidden');
 
-        parsed.choices.forEach(choice => {
+        // 選択肢をシャッフル
+        const shuffledChoices = shuffleChoices(parsed.choices);
+        currentChoiceMapping = shuffledChoices.map(c => c.originalNumber);
+
+        shuffledChoices.forEach((choice, displayIndex) => {
             const btn = document.createElement('button');
             btn.className = 'choice-btn';
             btn.innerHTML = `
-                <span class="choice-number">${choice.number}</span>
+                <span class="choice-number">${displayIndex + 1}</span>
                 <span class="choice-text">${formatText(choice.text)}</span>
             `;
-            btn.onclick = () => selectChoice(choice.number);
+            btn.dataset.originalNumber = choice.originalNumber;
+            btn.onclick = () => selectAnswer(choice.originalNumber, true, displayIndex + 1);
             choicesContainer.appendChild(btn);
         });
 
-        document.getElementById('show-answer-btn').classList.add('hidden');
-        document.getElementById('flashcard-controls').classList.add('hidden');
+        const showAnswerBtn = document.getElementById('show-answer-btn');
+        if (showAnswerBtn) {
+            showAnswerBtn.classList.add('hidden');
+        }
     } else {
-        // フラッシュカードモード
         questionText.innerHTML = formatText(question.question);
         choicesContainer.innerHTML = '';
         choicesContainer.classList.add('hidden');
-        document.getElementById('show-answer-btn').classList.remove('hidden');
-        document.getElementById('flashcard-controls').classList.add('hidden');
+        currentChoiceMapping = [];
+
+        const showAnswerBtn = document.getElementById('show-answer-btn');
+        if (showAnswerBtn) {
+            showAnswerBtn.classList.remove('hidden');
+        }
     }
 
-    // 進捗バー更新
-    const progress = (currentIndex / currentQuestions.length) * 100;
-    document.getElementById('progress').style.width = progress + '%';
-
-    // 解答セクションを隠す
-    document.getElementById('answer-section').classList.add('hidden');
     document.getElementById('result-feedback').classList.add('hidden');
     document.getElementById('next-btn').classList.add('hidden');
 
-    // ブックマークボタン更新
-    updateBookmarkButton();
+    const flashcardControls = document.getElementById('flashcard-controls');
+    if (flashcardControls) {
+        flashcardControls.classList.add('hidden');
+    }
+
+    const answerSection = document.getElementById('answer-section');
+    if (answerSection) {
+        answerSection.classList.add('hidden');
+    }
 }
 
-// 選択肢を選んだ時の処理
-function selectChoice(selectedNumber) {
+// 選択肢をシャッフルする関数
+function shuffleChoices(choices) {
+    const shuffled = choices.map(c => ({
+        originalNumber: c.number,
+        text: c.text
+    }));
+    // Fisher-Yatesシャッフル
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+function showAnswer() {
     const question = currentQuestions[currentIndex];
-    const correctAnswer = extractCorrectAnswer(question.answer);
-    const isCorrect = selectedNumber === correctAnswer;
+
+    const answerSection = document.getElementById('answer-section');
+    const answerText = document.getElementById('answer-text');
+
+    answerText.innerHTML = formatExplanation(question.answer);
+    answerSection.classList.remove('hidden');
+
+    const showAnswerBtn = document.getElementById('show-answer-btn');
+    if (showAnswerBtn) {
+        showAnswerBtn.classList.add('hidden');
+    }
+
+    const flashcardControls = document.getElementById('flashcard-controls');
+    if (flashcardControls) {
+        flashcardControls.classList.remove('hidden');
+    }
+}
+
+function markCorrect() {
+    const question = currentQuestions[currentIndex];
 
     userAnswers.push({
         questionId: question.id,
-        selected: selectedNumber,
-        correct: correctAnswer,
+        question: question.question,
+        userAnswer: 'correct',
+        correctAnswer: 'correct',
+        isCorrect: true
+    });
+
+    // 分野別統計を更新
+    updateCategoryStatsOnAnswer(question, true);
+
+    correctCount++;
+    recordCorrectAnswer(question.id);
+
+    nextQuestion();
+}
+
+function markWrong() {
+    const question = currentQuestions[currentIndex];
+
+    userAnswers.push({
+        questionId: question.id,
+        question: question.question,
+        userAnswer: 'wrong',
+        correctAnswer: 'correct',
+        isCorrect: false
+    });
+
+    // 分野別統計を更新
+    updateCategoryStatsOnAnswer(question, false);
+
+    saveWrongAnswer(question.id);
+
+    nextQuestion();
+}
+
+function selectAnswer(selected, isQuizMode = false, displayNumber = null) {
+    const question = currentQuestions[currentIndex];
+    const correctAnswer = extractCorrectAnswer(question.answer);
+    const isCorrect = selected === correctAnswer;
+
+    userAnswers.push({
+        questionId: question.id,
+        question: question.question,
+        choices: isQuizMode ? parseMultipleChoiceQuestion(question.question).choices : [],
+        userAnswer: selected,
+        correctAnswer: correctAnswer,
         isCorrect: isCorrect
     });
 
     // 分野別統計を更新
     updateCategoryStatsOnAnswer(question, isCorrect);
 
-    // 全ての選択肢ボタンを無効化し、正解/不正解を表示
+    if (isCorrect) {
+        correctCount++;
+        document.getElementById('correct-count').textContent = correctCount;
+        recordCorrectAnswer(question.id);
+    } else {
+        saveWrongAnswer(question.id);
+    }
+
     const buttons = document.querySelectorAll('.choice-btn');
     buttons.forEach((btn, index) => {
-        const btnNumber = index + 1;
         btn.classList.add('disabled');
         btn.onclick = null;
 
-        if (btnNumber === correctAnswer) {
+        const originalNum = parseInt(btn.dataset.originalNumber) || (index + 1);
+
+        // 正解の選択肢をハイライト
+        if (originalNum === correctAnswer) {
             btn.classList.add('correct');
-        } else if (btnNumber === selectedNumber && !isCorrect) {
+        }
+        // 間違いで選択した選択肢をハイライト
+        if (originalNum === selected && !isCorrect) {
             btn.classList.add('wrong');
         }
-
-        if (btnNumber === selectedNumber) {
+        // 選択した選択肢をマーク
+        if (originalNum === selected) {
             btn.classList.add('selected');
         }
     });
 
-    // フィードバック表示
     const feedback = document.getElementById('result-feedback');
-    feedback.classList.remove('hidden', 'correct', 'wrong');
+    feedback.classList.remove('hidden', 'correct-feedback', 'wrong-feedback');
 
     if (isCorrect) {
-        feedback.classList.add('correct');
-        feedback.innerHTML = `
-            <div class="feedback-icon">&#9711;</div>
-            <div class="feedback-text">正解!</div>
-        `;
-        correctCount++;
-        removeWrongAnswer(question.id);
+        feedback.classList.add('correct-feedback');
+        document.getElementById('feedback-icon').innerHTML = '&#9711;';
+        document.getElementById('feedback-text').textContent = '正解！';
+        document.getElementById('correct-answer').textContent = '';
     } else {
-        feedback.classList.add('wrong');
-        feedback.innerHTML = `
-            <div class="feedback-icon">&#10005;</div>
-            <div class="feedback-text">不正解</div>
-            <div class="correct-answer">正解は ${correctAnswer !== null && correctAnswer !== undefined ? correctAnswer : '(データなし)'} です</div>
-        `;
-        wrongInSession.push(question.id);
-        saveWrongAnswer(question.id);
+        feedback.classList.add('wrong-feedback');
+        document.getElementById('feedback-icon').innerHTML = '&#10005;';
+        document.getElementById('feedback-text').textContent = '不正解';
+        document.getElementById('correct-answer').textContent =
+            `正解は ${correctAnswer !== null && correctAnswer !== undefined ? correctAnswer : '(データなし)'} です`;
     }
 
-    document.getElementById('correct-count').textContent = correctCount;
-
-    // 解説を表示
-    showExplanation(question.answer);
+    const answerSection = document.getElementById('answer-section');
+    const answerText = document.getElementById('answer-text');
+    if (answerSection && answerText) {
+        answerText.innerHTML = formatExplanation(question.answer);
+        answerSection.classList.remove('hidden');
+    }
 
     // フィードバック内に解説を表示（R1形式）
     const explanationEl = document.getElementById('explanation');
@@ -760,128 +1157,63 @@ function selectChoice(selectedNumber) {
         }
     }
 
-    document.getElementById('next-btn').classList.remove('hidden');
-}
+    const nextBtn = document.getElementById('next-btn');
+    nextBtn.classList.remove('hidden');
 
-// 解答表示（フラッシュカードモード用）
-function showAnswer() {
-    const question = currentQuestions[currentIndex];
-    showExplanation(question.answer);
-    document.getElementById('show-answer-btn').classList.add('hidden');
-    document.getElementById('flashcard-controls').classList.remove('hidden');
-}
-
-// 解説のフォーマットと表示
-function formatExplanation(text) {
-    if (!text) return '';
-
-    let formatted = text;
-
-    // 【正解】セクションを検出してスタイリング
-    formatted = formatted.replace(/【正解】([^\n【]*)/g,
-        '<div class="explanation-section correct-section"><span class="explanation-label">【正解】</span>$1</div>');
-
-    // 【解説】セクションを検出してスタイリング
-    formatted = formatted.replace(/【解説】/g,
-        '<div class="explanation-section explanation-detail"><span class="explanation-label">【解説】</span>');
-
-    // 解説セクションの終了タグを追加（次のセクションまたは終端まで）
-    if (formatted.includes('explanation-detail')) {
-        formatted = formatted.replace(/(<div class="explanation-section explanation-detail">.*?)$/s, '$1</div>');
+    if (currentIndex === currentQuestions.length - 1) {
+        nextBtn.innerHTML = '<span class="btn-icon">&#128202;</span>結果を見る';
+        nextBtn.onclick = showResult;
+    } else {
+        nextBtn.innerHTML = '<span class="btn-icon">&#8594;</span>次の問題へ';
+        nextBtn.onclick = nextQuestion;
     }
-
-    // 残りのテキストをフォーマット
-    formatted = formatted
-        .replace(/\n/g, '<br>')
-        .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
-
-    return formatted;
 }
 
-function showExplanation(answerText) {
-    const answerEl = document.getElementById('answer-text');
-    answerEl.innerHTML = formatExplanation(answerText);
-    document.getElementById('answer-section').classList.remove('hidden');
-}
-
-function formatText(text) {
-    if (!text) return '';
-    return text
-        .replace(/\n/g, '<br>')
-        .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
-}
-
-// フラッシュカードの評価
-function markCorrect() {
-    const question = currentQuestions[currentIndex];
-
-    // 分野別統計を更新
-    updateCategoryStatsOnAnswer(question, true);
-
-    correctCount++;
-    removeWrongAnswer(question.id);
-    userAnswers.push({
-        questionId: question.id,
-        isCorrect: true
-    });
-    document.getElementById('correct-count').textContent = correctCount;
-    nextQuestion();
-}
-
-function markWrong() {
-    const question = currentQuestions[currentIndex];
-
-    // 分野別統計を更新
-    updateCategoryStatsOnAnswer(question, false);
-
-    wrongInSession.push(question.id);
-    saveWrongAnswer(question.id);
-    userAnswers.push({
-        questionId: question.id,
-        isCorrect: false
-    });
-    nextQuestion();
-}
-
-// 次の問題へ
 function nextQuestion() {
     currentIndex++;
+
+    const flashcardControls = document.getElementById('flashcard-controls');
+    if (flashcardControls) {
+        flashcardControls.classList.add('hidden');
+    }
+
     if (currentIndex >= currentQuestions.length) {
-        finishQuiz();
+        showResult();
     } else {
-        showQuestion();
+        displayQuestion();
+        window.scrollTo(0, 0);
     }
 }
 
-// 合格ライン（メンタルヘルス: 70%）
+// 合格ライン（メンタルヘルス: 60%）
 const PASS_LINE = 70;
 
-// クイズ終了
-function finishQuiz() {
-    stopTimer();
+function showResult() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
 
     const total = currentQuestions.length;
-    const score = Math.round((correctCount / total) * 100);
+    const rate = Math.round((correctCount / total) * 100);
 
-    saveStats(correctCount, total);
-    updateStatsDisplay();
-    updateWrongCount();
+    saveStats(correctCount, total, studyMode);
+    saveHistory(userAnswers);
 
-    document.getElementById('final-score').textContent = score;
+    document.getElementById('final-score').textContent = correctCount;
     document.getElementById('result-correct').textContent = correctCount;
     document.getElementById('result-total').textContent = total;
-    document.getElementById('result-rate').textContent = score;
-    document.getElementById('wrong-in-session').textContent = wrongInSession.length;
+    document.getElementById('result-rate').textContent = rate;
 
     // 合格ライン比較表示
     const passLineComparison = document.getElementById('pass-line-comparison');
     if (passLineComparison) {
-        const isPassed = score >= PASS_LINE;
+        const isPassed = rate >= PASS_LINE;
         passLineComparison.innerHTML = `
             <div class="pass-line-display ${isPassed ? 'passed' : 'failed'}">
                 <span class="pass-line-label">合格ライン: ${PASS_LINE}%</span>
                 <span class="pass-line-separator">/</span>
-                <span class="your-score-label">あなた: ${score}%</span>
+                <span class="your-score-label">あなた: ${rate}%</span>
                 <span class="pass-result-badge">${isPassed ? '合格' : '不合格'}</span>
             </div>
         `;
@@ -890,24 +1222,37 @@ function finishQuiz() {
     const messageEl = document.getElementById('result-message');
     messageEl.className = 'result-message';
 
-    if (score >= 90) {
+    if (rate >= 90) {
         messageEl.classList.add('excellent');
-        messageEl.textContent = '素晴らしい！完璧な成績です！';
-    } else if (score >= PASS_LINE) {
+        messageEl.textContent = '素晴らしい！ほぼ完璧です！';
+    } else if (rate >= 70) {
         messageEl.classList.add('good');
-        messageEl.textContent = 'よくできました！合格ラインクリア！';
-    } else if (score >= 50) {
+        messageEl.textContent = '良い成績です！合格ラインクリア！';
+    } else if (rate >= PASS_LINE) {
         messageEl.classList.add('pass');
-        messageEl.textContent = 'もう少しです。復習して再挑戦しましょう！';
+        messageEl.textContent = '合格ラインクリア！さらに上を目指しましょう！';
     } else {
         messageEl.classList.add('fail');
-        messageEl.textContent = '基礎からしっかり復習しましょう。';
+        messageEl.textContent = '復習が必要です。繰り返し学習しましょう！';
     }
+
+    const wrongCount = userAnswers.filter(a => !a.isCorrect).length;
+    document.getElementById('wrong-in-session').textContent = wrongCount;
 
     // 苦手分野分析を表示
     displayWeakCategoryAnalysis();
 
+    // 復習モード時は傾向分析を表示
+    if (isWrongReviewMode) {
+        displayReviewAnalysis();
+    }
+
     showScreen('result-screen');
+    window.scrollTo(0, 0);
+
+    // 復習モードをリセット
+    isWrongReviewMode = false;
+    wrongAnswersData = {};
 }
 
 // 苦手分野分析を結果画面に表示
@@ -992,155 +1337,156 @@ function displayWeakCategoryAnalysis() {
     container.appendChild(statsDiv);
 }
 
-// 解答確認
 function reviewAnswers() {
-    const reviewList = document.getElementById('review-list');
-    reviewList.innerHTML = '';
+    displayReviewList('all');
+    showScreen('review-screen');
+    window.scrollTo(0, 0);
+}
 
-    userAnswers.forEach((answer, index) => {
-        const question = quizData.find(q => q.id === answer.questionId);
-        if (!question) return;
+function displayReviewList(filter) {
+    const container = document.getElementById('review-list');
+    container.innerHTML = '';
 
-        const div = document.createElement('div');
-        div.className = `review-item ${answer.isCorrect ? 'correct' : 'wrong'}`;
-        div.dataset.correct = answer.isCorrect;
+    let filteredAnswers = userAnswers;
+    if (filter === 'correct') {
+        filteredAnswers = userAnswers.filter(a => a.isCorrect);
+    } else if (filter === 'wrong') {
+        filteredAnswers = userAnswers.filter(a => !a.isCorrect);
+    }
 
-        const questionPreview = question.question.substring(0, 100) + (question.question.length > 100 ? '...' : '');
+    if (filteredAnswers.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--text-light); padding: 40px;">該当する問題はありません</p>';
+        return;
+    }
 
-        div.innerHTML = `
+    filteredAnswers.forEach(answer => {
+        const item = document.createElement('div');
+        item.className = `review-item ${answer.isCorrect ? 'correct' : 'wrong'}`;
+
+        const questionPreview = answer.question.length > 100
+            ? answer.question.substring(0, 100) + '...'
+            : answer.question;
+
+        const bookmarks = getBookmarks();
+        const isBookmarked = bookmarks.includes(answer.questionId);
+
+        item.innerHTML = `
             <div class="review-item-header">
-                <span class="review-item-number">問${index + 1}</span>
-                <span class="review-item-status ${answer.isCorrect ? 'correct' : 'wrong'}">
-                    ${answer.isCorrect ? '正解' : '不正解'}
-                </span>
+                <span class="review-item-number">問題 ${answer.questionId}</span>
+                <div class="review-item-actions">
+                    <button class="bookmark-mini-btn ${isBookmarked ? 'active' : ''}"
+                            onclick="toggleBookmark(${answer.questionId}); this.classList.toggle('active');">
+                        ${isBookmarked ? '&#9733;' : '&#9734;'}
+                    </button>
+                    <span class="review-item-status ${answer.isCorrect ? 'correct' : 'wrong'}">
+                        ${answer.isCorrect ? '正解' : '不正解'}
+                    </span>
+                </div>
             </div>
-            <div class="review-item-question">${formatText(questionPreview)}</div>
-            ${answer.selected !== undefined ? `
+            <div class="review-item-question">${questionPreview}</div>
             <div class="review-item-answer">
-                あなたの解答: <span class="your-answer">${answer.selected}</span>
-                ${!answer.isCorrect ? `/ 正解: <span class="correct-ans">${answer.correct}</span>` : ''}
+                ${!answer.isCorrect && answer.userAnswer !== 'wrong' ? `<span class="your-answer">あなたの回答: ${answer.userAnswer}</span> / ` : ''}
+                ${answer.correctAnswer !== 'correct' ? `<span class="correct-ans">正解: ${answer.correctAnswer}</span>` : ''}
             </div>
-            ` : ''}
         `;
 
-        reviewList.appendChild(div);
+        container.appendChild(item);
     });
-
-    showScreen('review-screen');
 }
 
 function filterReview(filter) {
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.classList.remove('active');
-        if (btn.textContent.includes(filter === 'all' ? '全て' : filter === 'wrong' ? '不正解' : '正解')) {
-            btn.classList.add('active');
-        }
     });
-
-    document.querySelectorAll('.review-item').forEach(item => {
-        const isCorrect = item.dataset.correct === 'true';
-        if (filter === 'all') {
-            item.style.display = 'block';
-        } else if (filter === 'wrong') {
-            item.style.display = isCorrect ? 'none' : 'block';
-        } else if (filter === 'correct') {
-            item.style.display = isCorrect ? 'block' : 'none';
-        }
-    });
+    event.target.classList.add('active');
+    displayReviewList(filter);
 }
 
-function goToResult() {
-    showScreen('result-screen');
+// =====================
+// ダークモード
+// =====================
+
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    const isDark = document.body.classList.contains('dark-mode');
+    localStorage.setItem(DARK_MODE_KEY, isDark);
+    updateDarkModeButton();
 }
 
-// もう一度挑戦
-function restartQuiz() {
-    if (currentMode.startsWith('timer-')) {
-        startTimerMode(currentMode.replace('timer-', ''));
-    } else if (currentMode === 'wrong-review') {
-        startWrongReview();
-    } else if (currentMode === 'bookmark') {
-        startBookmarkStudy();
-    } else {
-        startQuiz(currentMode);
+function updateDarkModeButton() {
+    const btn = document.getElementById('dark-mode-btn');
+    if (btn) {
+        const isDark = document.body.classList.contains('dark-mode');
+        btn.innerHTML = isDark ? '&#9788;' : '&#127769;';
+        btn.title = isDark ? 'ライトモード' : 'ダークモード';
     }
 }
 
-// ブックマーク操作
-function bookmarkCurrentQuestion() {
-    const question = currentQuestions[currentIndex];
-    if (question) {
-        toggleBookmark(question.id);
-        updateBookmarkButton();
-        updateBookmarkCount();
-    }
-}
-
+// =====================
 // 統計画面
+// =====================
+
 function showStatsScreen() {
     const stats = getStats();
-    const wrong = getWrongAnswers();
+    const wrongAnswers = getWrongAnswers();
 
     document.getElementById('stats-total-attempts').textContent = stats.totalAttempts;
     document.getElementById('stats-total-questions').textContent = stats.totalQuestions;
     document.getElementById('stats-total-correct').textContent = stats.totalCorrect;
 
-    const rate = stats.totalQuestions > 0
+    const overallRate = stats.totalQuestions > 0
         ? Math.round((stats.totalCorrect / stats.totalQuestions) * 100)
         : 0;
-    document.getElementById('stats-overall-rate').textContent = rate + '%';
+    document.getElementById('stats-overall-rate').textContent = overallRate + '%';
 
-    // 苦手な問題TOP10
     const weakList = document.getElementById('weak-questions-list');
     weakList.innerHTML = '';
 
-    const wrongEntries = Object.entries(wrong)
+    const wrongEntries = Object.entries(wrongAnswers)
         .sort((a, b) => b[1].count - a[1].count)
         .slice(0, 10);
 
     if (wrongEntries.length === 0) {
-        weakList.innerHTML = '<p class="no-data">苦手な問題はありません</p>';
+        weakList.innerHTML = '<p style="text-align: center; color: var(--text-light); padding: 20px;">苦手な問題はありません</p>';
     } else {
         wrongEntries.forEach(([id, data]) => {
-            const question = quizData.find(q => q.id === id);
-            if (!question) return;
-
-            const div = document.createElement('div');
-            div.className = 'weak-item';
-            div.innerHTML = `
-                <div class="weak-item-header">
-                    <span class="weak-item-number">${question.type || '問題'}</span>
-                    <span class="weak-item-count">間違い: ${data.count}回</span>
-                </div>
-                <div class="weak-item-question">${question.question.substring(0, 80)}...</div>
-            `;
-            weakList.appendChild(div);
+            const question = quizData.find(q => q.id === parseInt(id));
+            if (question) {
+                const item = document.createElement('div');
+                item.className = 'weak-item';
+                item.innerHTML = `
+                    <div class="weak-item-header">
+                        <span class="weak-item-number">問題 ${id}</span>
+                        <span class="weak-item-count">間違い ${data.count}回</span>
+                    </div>
+                    <div class="weak-item-question">${question.question.substring(0, 80)}...</div>
+                `;
+                weakList.appendChild(item);
+            }
         });
     }
 
-    // 学習履歴
     const historyList = document.getElementById('history-list');
     historyList.innerHTML = '';
 
     const recentSessions = stats.sessions.slice(-10).reverse();
 
     if (recentSessions.length === 0) {
-        historyList.innerHTML = '<p class="no-data">学習履歴はありません</p>';
+        historyList.innerHTML = '<p style="text-align: center; color: var(--text-light); padding: 20px;">学習履歴はありません</p>';
     } else {
         recentSessions.forEach(session => {
             const date = new Date(session.date);
-            const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
-            const rate = Math.round((session.correct / session.total) * 100);
+            const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
 
-            const div = document.createElement('div');
-            div.className = 'history-item';
-            div.innerHTML = `
-                <span class="history-date">${dateStr}</span>
-                <span class="history-mode">${session.mode || '通常'}</span>
-                <span class="history-score">${session.correct}/${session.total}</span>
-                <span class="history-rate ${rate >= 70 ? 'good' : rate >= 50 ? 'pass' : 'fail'}">${rate}%</span>
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            item.innerHTML = `
+                <div class="history-date">${dateStr}</div>
+                <div class="history-mode">${getModeLabel(session.mode)}</div>
+                <div class="history-score">${session.correct}/${session.total}</div>
+                <div class="history-rate ${session.rate >= 70 ? 'good' : session.rate >= 60 ? 'pass' : 'fail'}">${session.rate}%</div>
             `;
-            historyList.appendChild(div);
+            historyList.appendChild(item);
         });
     }
 
@@ -1150,46 +1496,79 @@ function showStatsScreen() {
     showScreen('stats-screen');
 }
 
-// データリセット
+function getModeLabel(mode) {
+    const labels = {
+        'all': '全問題',
+        'random': 'ランダム',
+        'smart': 'スマート学習',
+        'wrong': '復習',
+        'bookmark': 'ブックマーク',
+        'weak_area': '苦手分野'
+    };
+    return labels[mode] || mode;
+}
+
 function resetAllData() {
     const currentUser = UserManager.getCurrentUser();
-    if (confirm(`${currentUser}さんの学習データをリセットしますか？\n（間違い記録、統計、ブックマーク、分野別統計が削除されます）`)) {
+    if (confirm(`${currentUser}さんの学習データをリセットしますか？\n（間違い記録、統計、ブックマーク、分野別統計、適応型学習データが削除されます）`)) {
         UserManager.removeUserData(STORAGE_BASE_KEYS.wrongAnswers);
         UserManager.removeUserData(STORAGE_BASE_KEYS.stats);
         UserManager.removeUserData(STORAGE_BASE_KEYS.bookmarks);
         UserManager.removeUserData(STORAGE_BASE_KEYS.history);
         UserManager.removeUserData(STORAGE_BASE_KEYS.categoryStats);
-
-        updateStatsDisplay();
-        updateWrongCount();
-        updateBookmarkCount();
-        updateCategoryStatsDisplay();
+        UserManager.removeUserData(STORAGE_BASE_KEYS.adaptiveLearning);
         alert('データをリセットしました');
         goHome();
     }
 }
 
+// =====================
 // ナビゲーション
+// =====================
+
+function goToResult() {
+    showScreen('result-screen');
+}
+
+function restartQuiz() {
+    startQuiz(studyMode, isTimerMode);
+}
+
 function goHome() {
-    stopTimer();
-    updateStatsDisplay();
-    updateWrongCount();
-    updateBookmarkCount();
-    updateCategoryStatsDisplay();
-    showScreen('start-screen');
-}
-
-// ユーティリティ
-function shuffleArray(array) {
-    const newArray = [...array];
-    for (let i = newArray.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
     }
-    return newArray;
+    showScreen('start-screen');
+    window.scrollTo(0, 0);
 }
 
+function startWrongReview() {
+    // 復習モードフラグを設定
+    isWrongReviewMode = true;
+    // 間違い履歴データを保存（復習中に参照するため）
+    wrongAnswersData = getWrongAnswers();
+    startQuiz('wrong', false);
+}
+
+function startBookmarkStudy() {
+    startQuiz('bookmark', false);
+}
+
+function startTimerMode(mode) {
+    startQuiz(mode, true);
+}
+
+function bookmarkCurrentQuestion() {
+    const question = currentQuestions[currentIndex];
+    toggleBookmark(question.id);
+}
+
+// =====================
 // 試験日カウントダウン機能
+// =====================
+
+// カウントダウン初期化
 function initExamCountdown() {
     const savedDate = localStorage.getItem(EXAM_DATE_KEY);
     if (savedDate) {
@@ -1197,13 +1576,15 @@ function initExamCountdown() {
     }
 }
 
+// 試験日を設定
 function setExamDate() {
     const savedDate = localStorage.getItem(EXAM_DATE_KEY);
     const defaultDate = savedDate || getDefaultExamDate();
+
     const input = prompt(
-        '試験日を入力してください (例: 2026-11-01)\n\n' +
-        '【メンタルヘルス・マネジメント検定 試験日目安】\n' +
-        '・公開試験: 11月第1日曜日、3月第3日曜日',
+        '試験日を入力してください (例: 2025-06-01)\n\n' +
+        '【メンタルヘルス 試験日目安】\n' +
+        '・学科試験: 試験日',
         defaultDate
     );
 
@@ -1214,85 +1595,68 @@ function setExamDate() {
             if (!isNaN(testDate.getTime())) {
                 localStorage.setItem(EXAM_DATE_KEY, input);
                 updateCountdownDisplay(input);
-            } else {
-                alert('有効な日付を入力してください');
+                return;
             }
-        } else {
-            alert('日付はYYYY-MM-DD形式で入力してください\n例: 2026-11-01');
         }
+        alert('日付の形式が正しくありません。\nYYYY-MM-DD の形式で入力してください。');
     }
 }
 
+// デフォルトの試験日を取得（次の試験日）
 function getDefaultExamDate() {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-
-    // 11月第1日曜日と3月第3日曜日を計算
-    // 11月より前なら今年の11月、11月以降なら来年の3月
-    if (currentMonth < 10) { // 11月(10)より前
-        return getFirstSunday(currentYear, 10); // 今年の11月第1日曜日
-    } else {
-        return getThirdSunday(currentYear + 1, 2); // 来年の3月第3日曜日
+    const today = new Date();
+    let year = today.getFullYear();
+    let examDate = getFirstSunday(year, 7);
+    if (examDate < today) {
+        examDate = getFirstSunday(year + 1, 7);
     }
+    return formatDate(examDate);
 }
 
+// 指定月の第1日曜日を取得
 function getFirstSunday(year, month) {
-    const date = new Date(year, month, 1);
-    const dayOfWeek = date.getDay();
-    const firstSunday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-    return `${year}-${String(month + 1).padStart(2, '0')}-${String(firstSunday).padStart(2, '0')}`;
+    const firstDay = new Date(year, month - 1, 1);
+    const firstSunday = 1 + (7 - firstDay.getDay()) % 7;
+    return new Date(year, month - 1, firstSunday);
 }
 
-function getThirdSunday(year, month) {
-    const date = new Date(year, month, 1);
-    const dayOfWeek = date.getDay();
-    const firstSunday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-    const thirdSunday = firstSunday + 14;
-    return `${year}-${String(month + 1).padStart(2, '0')}-${String(thirdSunday).padStart(2, '0')}`;
+// 日付をYYYY-MM-DD形式に
+function formatDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
 }
 
+// カウントダウン表示を更新
 function updateCountdownDisplay(dateStr) {
     const examDate = new Date(dateStr);
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     examDate.setHours(0, 0, 0, 0);
 
-    const diffTime = examDate.getTime() - now.getTime();
+    const diffTime = examDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    const countdownEl = document.getElementById('exam-countdown');
     const daysEl = document.getElementById('countdown-days');
     const dateEl = document.getElementById('countdown-date');
+    const countdownEl = document.getElementById('exam-countdown');
 
-    if (daysEl) {
+    if (daysEl && dateEl && countdownEl) {
+        daysEl.textContent = diffDays;
+        const displayDate = new Date(dateStr);
+        const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' };
+        dateEl.textContent = displayDate.toLocaleDateString('ja-JP', options);
+
+        countdownEl.classList.remove('warning', 'urgent', 'passed');
         if (diffDays < 0) {
-            daysEl.textContent = '終了';
             countdownEl.classList.add('passed');
-            countdownEl.classList.remove('warning', 'urgent');
-        } else {
-            daysEl.textContent = diffDays;
-            countdownEl.classList.remove('passed');
-
-            if (diffDays <= 7) {
-                countdownEl.classList.add('urgent');
-                countdownEl.classList.remove('warning');
-            } else if (diffDays <= 30) {
-                countdownEl.classList.add('warning');
-                countdownEl.classList.remove('urgent');
-            } else {
-                countdownEl.classList.remove('warning', 'urgent');
-            }
+            daysEl.textContent = '終了';
+        } else if (diffDays <= 7) {
+            countdownEl.classList.add('urgent');
+        } else if (diffDays <= 30) {
+            countdownEl.classList.add('warning');
         }
-    }
-
-    if (dateEl) {
-        const year = examDate.getFullYear();
-        const month = examDate.getMonth() + 1;
-        const day = examDate.getDate();
-        const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-        const weekday = weekdays[examDate.getDay()];
-        dateEl.textContent = `${year}年${month}月${day}日(${weekday})`;
     }
 }
 
@@ -1301,58 +1665,125 @@ document.addEventListener('keydown', (e) => {
     const quizScreen = document.getElementById('quiz-screen');
     if (!quizScreen || !quizScreen.classList.contains('active')) return;
 
+    const choiceButtons = document.querySelectorAll('.choice-btn');
+    const isAnswered = choiceButtons.length > 0 && choiceButtons[0].classList.contains('disabled');
+    const isQuizMode = choiceButtons.length > 0 && !document.getElementById('choices').classList.contains('hidden');
+
     const answerSection = document.getElementById('answer-section');
     const isAnswerVisible = answerSection && !answerSection.classList.contains('hidden');
-    const choicesContainer = document.getElementById('choices');
-    const isQuizMode = choicesContainer && !choicesContainer.classList.contains('hidden') && choicesContainer.children.length > 0;
-    const flashcardControls = document.getElementById('flashcard-controls');
-    const isFlashcardControlsVisible = flashcardControls && !flashcardControls.classList.contains('hidden');
 
-    switch (e.key) {
-        case ' ':
-        case 'Enter':
-            e.preventDefault();
-            if (!isAnswerVisible && !isQuizMode) {
-                showAnswer();
-            } else if (isAnswerVisible && !isFlashcardControlsVisible) {
-                nextQuestion();
-            }
-            break;
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-            if (isQuizMode && !isAnswerVisible) {
-                e.preventDefault();
-                selectChoice(parseInt(e.key));
-            }
-            break;
-        case 'ArrowRight':
-        case 'o':
-        case 'O':
-            e.preventDefault();
-            if (isFlashcardControlsVisible) {
-                markCorrect();
-            } else if (isAnswerVisible) {
-                nextQuestion();
-            }
-            break;
-        case 'ArrowLeft':
-        case 'x':
-        case 'X':
-            e.preventDefault();
-            if (isFlashcardControlsVisible) {
-                markWrong();
-            }
-            break;
-        case 'b':
-        case 'B':
-            e.preventDefault();
-            bookmarkCurrentQuestion();
-            break;
-        case 'Escape':
-            e.preventDefault();
-            goHome();
-            break;
+    if (!isAnswered && isQuizMode && ['1', '2', '3', '4'].includes(e.key)) {
+        const choiceIndex = parseInt(e.key);
+        if (choiceIndex <= choiceButtons.length) {
+            selectAnswer(choiceIndex, true);
+        }
+    }
+
+    if (!isQuizMode && !isAnswerVisible && e.key === ' ') {
+        e.preventDefault();
+        showAnswer();
+    }
+
+    if ((isAnswered || isAnswerVisible) && (e.key === 'Enter' || (isQuizMode && e.key === ' '))) {
+        e.preventDefault();
+        const nextBtn = document.getElementById('next-btn');
+        if (nextBtn && !nextBtn.classList.contains('hidden')) {
+            nextBtn.click();
+        }
+    }
+
+    if (!isQuizMode && isAnswerVisible && (e.key === 'ArrowRight' || e.key === 'o' || e.key === 'O')) {
+        e.preventDefault();
+        markCorrect();
+    }
+
+    if (!isQuizMode && isAnswerVisible && (e.key === 'ArrowLeft' || e.key === 'x' || e.key === 'X')) {
+        e.preventDefault();
+        markWrong();
+    }
+
+    if (e.key === 'b' || e.key === 'B') {
+        e.preventDefault();
+        bookmarkCurrentQuestion();
+    }
+
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        goHome();
     }
 });
+
+// =====================
+// スワイプナビゲーション
+// =====================
+(function() {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+    const minSwipeDistance = 80;
+    const maxVerticalDistance = 100;
+    let swipeHintShown = false;
+
+    function createSwipeHint() {
+        if (document.querySelector('.swipe-hint')) return;
+        const hint = document.createElement('div');
+        hint.className = 'swipe-hint';
+        hint.innerHTML = '左にスワイプで次の問題へ';
+        document.body.appendChild(hint);
+    }
+
+    function showSwipeHint() {
+        if (swipeHintShown) return;
+        const hint = document.querySelector('.swipe-hint');
+        if (hint) {
+            hint.classList.add('show');
+            setTimeout(() => hint.classList.remove('show'), 3000);
+            swipeHintShown = true;
+            localStorage.setItem('swipeHintShown', 'true');
+        }
+    }
+
+    function initSwipeHint() {
+        createSwipeHint();
+        if (!localStorage.getItem('swipeHintShown')) {
+            setTimeout(showSwipeHint, 2000);
+        } else {
+            swipeHintShown = true;
+        }
+    }
+
+    function handleSwipe() {
+        const quizScreen = document.getElementById('quiz-screen');
+        if (!quizScreen || !quizScreen.classList.contains('active')) return;
+
+        const diffX = touchStartX - touchEndX;
+        const diffY = Math.abs(touchStartY - touchEndY);
+
+        if (diffY > maxVerticalDistance) return;
+
+        if (diffX > minSwipeDistance) {
+            const nextBtn = document.getElementById('next-btn');
+            if (nextBtn && !nextBtn.classList.contains('hidden')) {
+                nextBtn.click();
+            }
+        }
+    }
+
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+        handleSwipe();
+    }, { passive: true });
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSwipeHint);
+    } else {
+        initSwipeHint();
+    }
+})();

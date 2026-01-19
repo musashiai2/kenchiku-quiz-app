@@ -1,4 +1,4 @@
-// アプリケーション状態
+﻿// アプリケーション状態
 let currentQuiz = [];
 let currentIndex = 0;
 let correctCount = 0;
@@ -10,32 +10,44 @@ let isTimerMode = false;
 let isMockExamMode = false;
 let mockExamStartTime = null;
 let mockExamType = null; // 'am' or 'pm'
+let isWrongReviewMode = false;
+let wrongAnswersData = {};
 
-// 模擬試験設定
+// 本番形式模擬試験の設定
 const MOCK_EXAM_CONFIG = {
     am: {
         questionCount: 44,
-        timeLimit: 150 * 60, // 2時間30分 = 9000秒
+        timeLimit: 150 * 60, // 2時間30分 = 150分 = 9000秒
         startQuestion: 1,
         endQuestion: 44,
         name: '午前の部'
     },
     pm: {
-        questionCount: 18,
-        timeLimit: 120 * 60, // 2時間 = 7200秒
+        questionCount: 28,
+        timeLimit: 120 * 60, // 2時間 = 120分 = 7200秒
         startQuestion: 45,
         endQuestion: 72,
         name: '午後の部'
     }
 };
-const PASS_RATE = 60;
+const PASS_RATE = 60; // 合格ライン60%
 
 // LocalStorage キー基底 (令和6年度用) - ユーザープレフィックスは UserManager が付与
 const STORAGE_BASE_KEYS = {
     wrongAnswers: 'wrong_r6',
     stats: 'stats_r6',
     bookmarks: 'bookmarks_r6',
-    history: 'history_r6'
+    history: 'history_r6',
+    adaptiveLearning: 'adaptive_r6'
+};
+
+// 適応型学習の設定
+const ADAPTIVE_CONFIG = {
+    consecutiveCorrectToMaster: 3,
+    masterCooldownDays: 7,
+    wrongPriorityWeight: 3,
+    recentWrongBoost: 2,
+    recentWrongDays: 3
 };
 
 // ダークモードは共通設定
@@ -90,6 +102,7 @@ function saveWrongAnswer(questionId) {
     wrongAnswers[questionId].count++;
     wrongAnswers[questionId].lastWrong = new Date().toISOString();
     UserManager.setUserData(STORAGE_BASE_KEYS.wrongAnswers, wrongAnswers);
+    updateAdaptiveLearning(questionId, false);
 }
 
 // 正解した問題を記録（間違い回数を減らす）
@@ -103,6 +116,96 @@ function recordCorrectAnswer(questionId) {
         }
         UserManager.setUserData(STORAGE_BASE_KEYS.wrongAnswers, wrongAnswers);
     }
+    updateAdaptiveLearning(questionId, true);
+}
+
+// =====================
+// 適応型学習システム
+// =====================
+
+function getAdaptiveLearning() {
+    return UserManager.getUserData(STORAGE_BASE_KEYS.adaptiveLearning, {});
+}
+
+function updateAdaptiveLearning(questionId, isCorrect) {
+    const adaptive = getAdaptiveLearning();
+    if (!adaptive[questionId]) {
+        adaptive[questionId] = {
+            consecutiveCorrect: 0,
+            lastAnswered: null,
+            masteredAt: null,
+            totalCorrect: 0,
+            totalAttempts: 0
+        };
+    }
+    const data = adaptive[questionId];
+    data.totalAttempts++;
+    data.lastAnswered = new Date().toISOString();
+    if (isCorrect) {
+        data.consecutiveCorrect++;
+        data.totalCorrect++;
+        if (data.consecutiveCorrect >= ADAPTIVE_CONFIG.consecutiveCorrectToMaster) {
+            data.masteredAt = new Date().toISOString();
+        }
+    } else {
+        data.consecutiveCorrect = 0;
+        data.masteredAt = null;
+    }
+    UserManager.setUserData(STORAGE_BASE_KEYS.adaptiveLearning, adaptive);
+}
+
+function isQuestionMastered(questionId) {
+    const adaptive = getAdaptiveLearning();
+    const data = adaptive[questionId];
+    if (!data || !data.masteredAt) return false;
+    const masteredDate = new Date(data.masteredAt);
+    const cooldownEnd = new Date(masteredDate);
+    cooldownEnd.setDate(cooldownEnd.getDate() + ADAPTIVE_CONFIG.masterCooldownDays);
+    return new Date() < cooldownEnd;
+}
+
+function calculateQuestionPriority(question) {
+    const wrongAnswers = getWrongAnswers();
+    const adaptive = getAdaptiveLearning();
+    let score = 100;
+    const questionId = question.id;
+    const wrongData = wrongAnswers[questionId];
+    const adaptiveData = adaptive[questionId];
+
+    if (wrongData) {
+        score += wrongData.count * ADAPTIVE_CONFIG.wrongPriorityWeight * 10;
+        if (wrongData.lastWrong) {
+            const daysSinceWrong = (new Date() - new Date(wrongData.lastWrong)) / (1000 * 60 * 60 * 24);
+            if (daysSinceWrong <= ADAPTIVE_CONFIG.recentWrongDays) {
+                score += ADAPTIVE_CONFIG.recentWrongBoost * 20;
+            }
+        }
+    }
+    if (isQuestionMastered(questionId)) {
+        score -= 80;
+    }
+    if (adaptiveData && adaptiveData.consecutiveCorrect > 0) {
+        score -= adaptiveData.consecutiveCorrect * 10;
+    }
+    if (!adaptiveData || adaptiveData.totalAttempts === 0) {
+        score += 20;
+    }
+    return score;
+}
+
+function selectQuestionsAdaptively(questions, count) {
+    const scoredQuestions = questions.map(q => ({
+        question: q,
+        score: calculateQuestionPriority(q),
+        random: Math.random()
+    }));
+    scoredQuestions.sort((a, b) => {
+        const scoreDiff = b.score - a.score;
+        if (Math.abs(scoreDiff) < 10) return a.random - b.random;
+        return scoreDiff;
+    });
+    const selected = scoredQuestions.slice(0, count).map(sq => sq.question);
+    return shuffleArray(selected);
 }
 
 // ブックマークを取得
@@ -268,30 +371,44 @@ function startQuiz(mode, withTimer = false) {
     // モードに応じて問題を選択
     switch (mode) {
         case 'all':
-            currentQuiz = [...quizData];
+            // 全問題モードでもシャッフル
+            currentQuiz = shuffleArray([...quizData]);
             break;
         case 'am':
-            currentQuiz = quizData.filter(q => q.id <= 44);
+            currentQuiz = shuffleArray(quizData.filter(q => q.id <= 50));
             break;
         case 'pm':
-            // 午後の部: 問題45-50と61-72（四肢択一のみ、応用能力問題51-60を除く）
-            currentQuiz = quizData.filter(q => (q.id >= 45 && q.id <= 50) || (q.id >= 61 && q.id <= 72));
+            currentQuiz = shuffleArray(quizData.filter(q => q.id > 50));
             break;
         case 'random':
-            currentQuiz = shuffleArray([...quizData]).slice(0, 20);
+            // 適応型学習で賢く選択
+            currentQuiz = selectQuestionsAdaptively([...quizData], 20);
+            break;
+        case 'smart':
+            // スマート学習モード（苦手問題優先）
+            currentQuiz = selectQuestionsAdaptively([...quizData], Math.min(30, quizData.length));
             break;
         case 'wrong':
             const wrongAnswers = getWrongAnswers();
             const wrongIds = Object.keys(wrongAnswers).map(id => parseInt(id));
             currentQuiz = quizData.filter(q => wrongIds.includes(q.id));
-            // 間違い回数が多い順にソート
+            // 間違い回数が多い順+最近間違えた順でソート後シャッフル
             currentQuiz.sort((a, b) => {
-                return (wrongAnswers[b.id]?.count || 0) - (wrongAnswers[a.id]?.count || 0);
+                const countDiff = (wrongAnswers[b.id]?.count || 0) - (wrongAnswers[a.id]?.count || 0);
+                if (countDiff !== 0) return countDiff;
+                const aDate = wrongAnswers[a.id]?.lastWrong ? new Date(wrongAnswers[a.id].lastWrong) : new Date(0);
+                const bDate = wrongAnswers[b.id]?.lastWrong ? new Date(wrongAnswers[b.id].lastWrong) : new Date(0);
+                return bDate - aDate;
             });
+            // 上位50%をシャッフル
+            const halfLength = Math.ceil(currentQuiz.length / 2);
+            const topHalf = shuffleArray(currentQuiz.slice(0, halfLength));
+            const bottomHalf = currentQuiz.slice(halfLength);
+            currentQuiz = [...topHalf, ...bottomHalf];
             break;
         case 'bookmark':
             const bookmarks = getBookmarks();
-            currentQuiz = quizData.filter(q => bookmarks.includes(q.id));
+            currentQuiz = shuffleArray(quizData.filter(q => bookmarks.includes(q.id)));
             break;
     }
 
@@ -356,11 +473,103 @@ function updateTimerDisplay() {
 
 // 配列シャッフル
 function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
     }
-    return array;
+    return newArray;
+}
+
+// 現在の問題の選択肢マッピング（シャッフル対応）
+let currentChoiceMapping = [];
+
+// =====================
+// 復習モード強化機能
+// =====================
+
+function displayWrongReviewBadge(question) {
+    const existingBadge = document.getElementById('wrong-review-badge');
+    if (existingBadge) existingBadge.remove();
+    const existingHint = document.getElementById('review-hint');
+    if (existingHint) existingHint.remove();
+    if (!isWrongReviewMode) return;
+    const wrongData = wrongAnswersData[question.id];
+    if (!wrongData) return;
+    const badge = document.createElement('div');
+    badge.id = 'wrong-review-badge';
+    badge.className = 'wrong-review-badge';
+    const wrongCount = wrongData.count || 0;
+    let urgencyClass = '', urgencyText = '';
+    if (wrongCount >= 3) { urgencyClass = 'high-priority'; urgencyText = '要注意'; }
+    else if (wrongCount >= 2) { urgencyClass = 'medium-priority'; urgencyText = '復習推奨'; }
+    else { urgencyClass = 'low-priority'; urgencyText = '確認'; }
+    badge.classList.add(urgencyClass);
+    badge.innerHTML = `<span class="badge-icon">&#128270;</span><span class="badge-text">${urgencyText}: ${wrongCount}回間違い</span>`;
+    const questionHeader = document.querySelector('.question-header') || document.querySelector('.quiz-header');
+    if (questionHeader) questionHeader.appendChild(badge);
+    displayReviewHint(question, wrongData);
+}
+
+function displayReviewHint(question, wrongData) {
+    const hintContainer = document.createElement('div');
+    hintContainer.id = 'review-hint';
+    hintContainer.className = 'review-hint';
+    const wrongCount = wrongData.count || 0;
+    const lastWrong = wrongData.lastWrong ? new Date(wrongData.lastWrong) : null;
+    let hintText = '', tipsList = [];
+    if (wrongCount >= 3) { hintText = 'この問題は複数回間違えています。'; tipsList.push('解説をよく読んで理解を深めましょう'); }
+    else if (wrongCount >= 2) { hintText = 'この問題は以前も間違えています。'; tipsList.push('前回の間違いを思い出して慎重に解答しましょう'); }
+    else { hintText = 'この問題で一度間違えています。'; tipsList.push('落ち着いて問題文を読みましょう'); }
+    let lastWrongText = '';
+    if (lastWrong) {
+        const diffDays = Math.floor((new Date() - lastWrong) / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) lastWrongText = '今日間違えました';
+        else if (diffDays === 1) lastWrongText = '昨日間違えました';
+        else if (diffDays < 7) lastWrongText = `${diffDays}日前に間違えました`;
+        else lastWrongText = `${Math.floor(diffDays / 7)}週間前に間違えました`;
+    }
+    hintContainer.innerHTML = `<div class="hint-header"><span class="hint-icon">&#128161;</span><span class="hint-title">復習ポイント</span></div><div class="hint-content"><p class="hint-message">${hintText}</p>${lastWrongText ? `<p class="hint-last-wrong">${lastWrongText}</p>` : ''}<ul class="hint-tips">${tipsList.map(tip => `<li>${tip}</li>`).join('')}</ul></div>`;
+    const questionText = document.getElementById('question-text');
+    if (questionText && questionText.parentNode) questionText.parentNode.insertBefore(hintContainer, questionText);
+}
+
+function generateReviewAnalysis() {
+    if (!isWrongReviewMode || userAnswers.length === 0) return null;
+    const analysis = { totalReviewed: userAnswers.length, improved: 0, stillWrong: 0, frequentWrong: [], recommendations: [] };
+    userAnswers.forEach(answer => {
+        if (answer.isCorrect) { analysis.improved++; }
+        else { analysis.stillWrong++; const wrongData = wrongAnswersData[answer.questionId]; if (wrongData && wrongData.count >= 3) analysis.frequentWrong.push({ id: answer.questionId, count: wrongData.count }); }
+    });
+    const improvementRate = Math.round((analysis.improved / analysis.totalReviewed) * 100);
+    if (improvementRate >= 80) analysis.recommendations.push('素晴らしい改善です！');
+    else if (improvementRate >= 60) analysis.recommendations.push('良い進歩です。');
+    else analysis.recommendations.push('復習を継続しましょう。');
+    if (analysis.frequentWrong.length > 0) analysis.recommendations.push(`問題${analysis.frequentWrong.map(q => q.id).join(', ')}は重点的に復習しましょう。`);
+    return analysis;
+}
+
+function displayReviewAnalysis() {
+    const analysis = generateReviewAnalysis();
+    if (!analysis) return;
+    const container = document.getElementById('wrong-questions-list') || document.querySelector('.result-details');
+    if (!container) return;
+    const improvementRate = Math.round((analysis.improved / analysis.totalReviewed) * 100);
+    const analysisHTML = `<div class="review-analysis"><div class="analysis-header"><span class="analysis-icon">&#128200;</span><span class="analysis-title">復習結果の分析</span></div><div class="analysis-summary"><div class="summary-item"><span class="summary-label">改善率</span><span class="summary-value">${improvementRate}%</span></div><div class="summary-item"><span class="summary-label">正解</span><span class="summary-value">${analysis.improved}問</span></div><div class="summary-item"><span class="summary-label">不正解</span><span class="summary-value">${analysis.stillWrong}問</span></div></div><div class="recommendations-section"><div class="section-header"><span class="bulb-icon">&#128161;</span><span>学習アドバイス</span></div><ul class="recommendations-list">${analysis.recommendations.map(rec => `<li>${rec}</li>`).join('')}</ul></div></div>`;
+    container.insertAdjacentHTML('beforebegin', analysisHTML);
+}
+
+// 選択肢をシャッフルする関数
+function shuffleChoices(choices) {
+    const shuffled = choices.map((text, index) => ({
+        originalIndex: index + 1,
+        text: text
+    }));
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
 }
 
 // 問題表示
@@ -383,6 +592,13 @@ function displayQuestion() {
     // 問題タイプバッジを更新（四肢択一 or 五肢択一）
     updateQuestionTypeBadge(choiceCount);
 
+    // 復習モード時の間違い回数バッジ表示
+    displayWrongReviewBadge(question);
+
+    // 選択肢をシャッフル
+    const shuffledChoices = shuffleChoices(question.choices);
+    currentChoiceMapping = shuffledChoices.map(c => c.originalIndex);
+
     // 選択肢表示
     const choicesContainer = document.getElementById('choices');
     choicesContainer.innerHTML = '';
@@ -394,14 +610,15 @@ function displayQuestion() {
         choicesContainer.classList.remove('five-choices');
     }
 
-    question.choices.forEach((choice, index) => {
+    shuffledChoices.forEach((choice, displayIndex) => {
         const btn = document.createElement('button');
         btn.className = 'choice-btn';
         btn.innerHTML = `
-            <span class="choice-number">${index + 1}</span>
-            <span class="choice-text">${choice}</span>
+            <span class="choice-number">${displayIndex + 1}</span>
+            <span class="choice-text">${choice.text}</span>
         `;
-        btn.onclick = () => selectAnswer(index + 1);
+        btn.dataset.originalIndex = choice.originalIndex;
+        btn.onclick = () => selectAnswer(choice.originalIndex);
         choicesContainer.appendChild(btn);
     });
 
@@ -457,19 +674,24 @@ function selectAnswer(selected) {
         saveWrongAnswer(question.id);
     }
 
-    // 選択肢のスタイル更新
+    // 選択肢のスタイル更新（シャッフル対応）
     const buttons = document.querySelectorAll('.choice-btn');
-    buttons.forEach((btn, index) => {
+    buttons.forEach((btn) => {
         btn.classList.add('disabled');
         btn.onclick = null;
 
-        if (index + 1 === question.correct) {
+        const originalIndex = parseInt(btn.dataset.originalIndex);
+
+        // 正解の選択肢をハイライト
+        if (originalIndex === question.correct) {
             btn.classList.add('correct');
-        } else if (index + 1 === selected && !isCorrect) {
+        }
+        // 間違いで選択した選択肢をハイライト
+        if (originalIndex === selected && !isCorrect) {
             btn.classList.add('wrong');
         }
-
-        if (index + 1 === selected) {
+        // 選択した選択肢をマーク
+        if (originalIndex === selected) {
             btn.classList.add('selected');
         }
     });
@@ -493,10 +715,13 @@ function selectAnswer(selected) {
 
     // 解説表示
     const explanationEl = document.getElementById('explanation');
-    if (explanationEl && question.explanation) {
-        explanationEl.innerHTML = `<div class="explanation-label">【解説】</div><div class="explanation-content">${question.explanation.replace(/\n/g, '<br>')}</div>`;
+    if (question.explanation) {
+        explanationEl.innerHTML = `
+            <div class="explanation-title">【解説】</div>
+            <div class="explanation-content">${question.explanation}</div>
+        `;
         explanationEl.classList.remove('hidden');
-    } else if (explanationEl) {
+    } else {
         explanationEl.classList.add('hidden');
     }
 
@@ -543,13 +768,6 @@ function showResult() {
     document.getElementById('result-total').textContent = total;
     document.getElementById('result-rate').textContent = rate;
 
-    // 模擬試験モードの場合は合否判定を表示
-    if (isMockExamMode) {
-        showMockExamResult();
-    } else {
-        document.getElementById('mock-exam-result').classList.add('hidden');
-    }
-
     // 合格ライン比較表示
     const passLineComparison = document.getElementById('pass-line-comparison');
     if (passLineComparison) {
@@ -589,8 +807,17 @@ function showResult() {
     // 苦手分野分析を表示（問題番号ベース）
     displayWeakAnalysis();
 
+    // 復習モード時は傾向分析を表示
+    if (isWrongReviewMode) {
+        displayReviewAnalysis();
+    }
+
     showScreen('result-screen');
     window.scrollTo(0, 0);
+
+    // 復習モードをリセット
+    isWrongReviewMode = false;
+    wrongAnswersData = {};
 }
 
 // 苦手分野分析を結果画面に表示（午前/午後で分析）
@@ -678,88 +905,6 @@ function displayWeakAnalysis() {
     });
 
     container.appendChild(statsDiv);
-}
-
-// 模擬試験結果表示
-function showMockExamResult() {
-    const mockExamResultEl = document.getElementById('mock-exam-result');
-    const passFailBadge = document.getElementById('pass-fail-badge');
-    const passFailText = document.getElementById('pass-fail-text');
-    const timeInfoEl = document.getElementById('mock-exam-time-info');
-
-    const total = currentQuiz.length;
-    const rate = Math.round((correctCount / total) * 100);
-    const passed = rate >= PASS_RATE;
-
-    // 経過時間を計算
-    const endTime = new Date();
-    const elapsedMs = endTime - mockExamStartTime;
-    const elapsedMinutes = Math.floor(elapsedMs / 60000);
-    const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
-
-    // 制限時間
-    const config = MOCK_EXAM_CONFIG[mockExamType];
-    const timeLimitMinutes = config.timeLimit / 60;
-
-    // 合否表示
-    mockExamResultEl.classList.remove('hidden');
-    passFailBadge.className = 'pass-fail-badge ' + (passed ? 'passed' : 'failed');
-    passFailText.textContent = passed ? '合格' : '不合格';
-
-    // 時間情報
-    const remainingMinutes = Math.floor(timeRemaining / 60);
-    const remainingSeconds = timeRemaining % 60;
-    timeInfoEl.innerHTML = `
-        <strong>${config.name}</strong><br>
-        経過時間: ${elapsedMinutes}分${elapsedSeconds}秒<br>
-        残り時間: ${remainingMinutes}分${remainingSeconds}秒<br>
-        制限時間: ${Math.floor(timeLimitMinutes / 60)}時間${timeLimitMinutes % 60}分
-    `;
-}
-
-// 模擬試験開始
-function startMockExam(type) {
-    const config = MOCK_EXAM_CONFIG[type];
-
-    if (!confirm(`${config.name}の模擬試験を開始します。\n\n` +
-        `問題数: ${config.questionCount}問\n` +
-        `制限時間: ${Math.floor(config.timeLimit / 3600)}時間${(config.timeLimit % 3600) / 60}分\n` +
-        `合格ライン: ${PASS_RATE}%以上\n\n` +
-        `開始しますか？`)) {
-        return;
-    }
-
-    isMockExamMode = true;
-    mockExamType = type;
-    mockExamStartTime = new Date();
-    quizMode = type;
-    currentIndex = 0;
-    correctCount = 0;
-    userAnswers = [];
-    isTimerMode = true;
-
-    // 問題をフィルタリング（午後は45-50と61-72）
-    if (type === 'am') {
-        currentQuiz = quizData.filter(q => q.id >= config.startQuestion && q.id <= config.endQuestion);
-    } else {
-        currentQuiz = quizData.filter(q => (q.id >= 45 && q.id <= 50) || (q.id >= 61 && q.id <= 72));
-    }
-
-    if (currentQuiz.length === 0) {
-        alert('該当する問題がありません');
-        isMockExamMode = false;
-        return;
-    }
-
-    document.getElementById('total-num').textContent = currentQuiz.length;
-
-    // タイマー設定
-    timeRemaining = config.timeLimit;
-    document.getElementById('timer-display').classList.remove('hidden');
-    startTimer();
-
-    showScreen('quiz-screen');
-    displayQuestion();
 }
 
 // 解答確認
@@ -930,6 +1075,7 @@ function getModeLabel(mode) {
         'am': '午前',
         'pm': '午後',
         'random': 'ランダム',
+        'smart': 'スマート学習',
         'wrong': '復習',
         'bookmark': 'ブックマーク'
     };
@@ -939,11 +1085,12 @@ function getModeLabel(mode) {
 // データリセット
 function resetAllData() {
     const currentUser = UserManager.getCurrentUser();
-    if (confirm(`${currentUser}さんの学習データをリセットしますか？\n（間違い記録、統計、ブックマークが削除されます）`)) {
+    if (confirm(`${currentUser}さんの学習データをリセットしますか？\n（間違い記録、統計、ブックマーク、適応型学習データが削除されます）`)) {
         UserManager.removeUserData(STORAGE_BASE_KEYS.wrongAnswers);
         UserManager.removeUserData(STORAGE_BASE_KEYS.stats);
         UserManager.removeUserData(STORAGE_BASE_KEYS.bookmarks);
         UserManager.removeUserData(STORAGE_BASE_KEYS.history);
+        UserManager.removeUserData(STORAGE_BASE_KEYS.adaptiveLearning);
         alert('データをリセットしました');
         goHome();
     }
@@ -966,14 +1113,14 @@ function goHome() {
         clearInterval(timerInterval);
         timerInterval = null;
     }
-    isMockExamMode = false;
-    mockExamType = null;
     showScreen('start-screen');
     window.scrollTo(0, 0);
 }
 
 // 復習モード（間違えた問題）
 function startWrongReview() {
+    isWrongReviewMode = true;
+    wrongAnswersData = getWrongAnswers();
     startQuiz('wrong', false);
 }
 
@@ -1036,10 +1183,15 @@ function setExamDate() {
 function getDefaultExamDate() {
     const today = new Date();
     let year = today.getFullYear();
+
+    // 6月を基準に次の試験日を計算
     let examDate = getSecondSunday(year, 6);
+
+    // 既に過ぎていたら来年
     if (examDate < today) {
         examDate = getSecondSunday(year + 1, 6);
     }
+
     return formatDate(examDate);
 }
 
@@ -1074,10 +1226,13 @@ function updateCountdownDisplay(dateStr) {
 
     if (daysEl && dateEl && countdownEl) {
         daysEl.textContent = diffDays;
+
+        // 日付を表示用にフォーマット
         const displayDate = new Date(dateStr);
         const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' };
         dateEl.textContent = displayDate.toLocaleDateString('ja-JP', options);
 
+        // 残り日数に応じてクラスを変更
         countdownEl.classList.remove('warning', 'urgent', 'passed');
         if (diffDays < 0) {
             countdownEl.classList.add('passed');
@@ -1090,34 +1245,25 @@ function updateCountdownDisplay(dateStr) {
     }
 }
 
-// =====================
 // キーボードショートカット
-// =====================
-
-// キーボードイベントハンドラー
 document.addEventListener('keydown', (e) => {
     // クイズ画面でのみ有効
     const quizScreen = document.getElementById('quiz-screen');
-    if (!quizScreen || !quizScreen.classList.contains('active')) {
-        return;
-    }
+    if (!quizScreen || !quizScreen.classList.contains('active')) return;
 
-    // 選択肢が無効化されているか確認（既に回答済みか）
+    // 選択肢が無効化されているか確認
     const choiceButtons = document.querySelectorAll('.choice-btn');
     const isAnswered = choiceButtons.length > 0 && choiceButtons[0].classList.contains('disabled');
 
-    // 数字キー 1-5 で選択肢を選択
+    // 1-5キーで回答選択（回答前のみ）
     if (!isAnswered && ['1', '2', '3', '4', '5'].includes(e.key)) {
         const choiceIndex = parseInt(e.key);
-        const question = currentQuiz[currentIndex];
-
-        // 選択肢の数を確認（4択か5択か）
-        if (choiceIndex <= question.choices.length) {
+        if (choiceIndex <= choiceButtons.length) {
             selectAnswer(choiceIndex);
         }
     }
 
-    // Enter または Space で次の問題へ（回答後のみ）
+    // Enterキーまたはスペースキーで次へ（回答後のみ）
     if (isAnswered && (e.key === 'Enter' || e.key === ' ')) {
         e.preventDefault();
         const nextBtn = document.getElementById('next-btn');
@@ -1125,9 +1271,274 @@ document.addEventListener('keydown', (e) => {
             nextBtn.click();
         }
     }
-
-    // B キーでブックマーク切り替え
-    if (e.key === 'b' || e.key === 'B') {
-        bookmarkCurrentQuestion();
-    }
 });
+
+// =====================
+// 本番形式模擬試験
+// =====================
+
+// 模擬試験開始
+function startMockExam(type) {
+    const config = MOCK_EXAM_CONFIG[type];
+    if (!config) {
+        alert('無効な試験タイプです');
+        return;
+    }
+
+    // 確認ダイアログ
+    const confirmMsg = `【${config.name}】\n\n` +
+        `問題数: ${config.questionCount}問\n` +
+        `制限時間: ${Math.floor(config.timeLimit / 60)}分\n` +
+        `合格ライン: ${PASS_RATE}%以上\n\n` +
+        `本番形式で開始しますか？\n` +
+        `※途中で中断すると記録されません`;
+
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+
+    // 模擬試験モードを設定
+    isMockExamMode = true;
+    mockExamType = type;
+    mockExamStartTime = new Date();
+    quizMode = 'mock_' + type;
+    currentIndex = 0;
+    correctCount = 0;
+    userAnswers = [];
+    isTimerMode = true;
+
+    // 問題を選択（問題IDの範囲で選択）
+    currentQuiz = quizData.filter(q =>
+        q.id >= config.startQuestion && q.id <= config.endQuestion
+    );
+
+    // 問題数が足りない場合は警告
+    if (currentQuiz.length < config.questionCount) {
+        console.warn(`問題数が不足しています: ${currentQuiz.length}/${config.questionCount}`);
+    }
+
+    // 問題数を制限
+    currentQuiz = currentQuiz.slice(0, config.questionCount);
+
+    if (currentQuiz.length === 0) {
+        alert('該当する問題がありません');
+        isMockExamMode = false;
+        return;
+    }
+
+    document.getElementById('total-num').textContent = currentQuiz.length;
+
+    // タイマー設定
+    timeRemaining = config.timeLimit;
+    document.getElementById('timer-display').classList.remove('hidden');
+    startTimer();
+
+    showScreen('quiz-screen');
+    displayQuestion();
+}
+
+// 結果表示（模擬試験用の拡張）
+function showMockExamResult() {
+    const total = currentQuiz.length;
+    const rate = Math.round((correctCount / total) * 100);
+    const isPassed = rate >= PASS_RATE;
+    const config = MOCK_EXAM_CONFIG[mockExamType];
+
+    // 模擬試験結果表示
+    const mockExamResultEl = document.getElementById('mock-exam-result');
+    const passFailBadge = document.getElementById('pass-fail-badge');
+    const passFailText = document.getElementById('pass-fail-text');
+    const timeInfoEl = document.getElementById('mock-exam-time-info');
+
+    if (mockExamResultEl) {
+        mockExamResultEl.classList.remove('hidden');
+
+        // 合否判定
+        if (isPassed) {
+            passFailBadge.className = 'pass-fail-badge passed';
+            passFailText.textContent = '合格';
+        } else {
+            passFailBadge.className = 'pass-fail-badge failed';
+            passFailText.textContent = '不合格';
+        }
+
+        // 所要時間計算
+        const endTime = new Date();
+        const elapsedMs = endTime - mockExamStartTime;
+        const elapsedMinutes = Math.floor(elapsedMs / 60000);
+        const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
+
+        // 残り時間または経過時間を表示
+        if (timeRemaining > 0) {
+            const remainMinutes = Math.floor(timeRemaining / 60);
+            const remainSeconds = timeRemaining % 60;
+            timeInfoEl.innerHTML = `
+                <strong>${config.name}</strong><br>
+                所要時間: ${elapsedMinutes}分${elapsedSeconds}秒<br>
+                残り時間: ${remainMinutes}分${remainSeconds}秒<br>
+                合格ライン: ${PASS_RATE}%
+            `;
+        } else {
+            timeInfoEl.innerHTML = `
+                <strong>${config.name}</strong><br>
+                時間切れ<br>
+                合格ライン: ${PASS_RATE}%
+            `;
+        }
+    }
+}
+
+// 結果表示を拡張（既存のshowResultを上書き）
+const originalShowResult = showResult;
+showResult = function() {
+    // タイマー停止
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+
+    const total = currentQuiz.length;
+    const rate = Math.round((correctCount / total) * 100);
+
+    // 統計保存
+    saveStats(correctCount, total, quizMode);
+    saveHistory(userAnswers);
+
+    document.getElementById('final-score').textContent = correctCount;
+    document.getElementById('result-correct').textContent = correctCount;
+    document.getElementById('result-total').textContent = total;
+    document.getElementById('result-rate').textContent = rate;
+
+    // 模擬試験モードの場合は合否判定を表示
+    const mockExamResultEl = document.getElementById('mock-exam-result');
+    if (isMockExamMode && mockExamResultEl) {
+        showMockExamResult();
+    } else if (mockExamResultEl) {
+        mockExamResultEl.classList.add('hidden');
+    }
+
+    // メッセージ設定
+    const messageEl = document.getElementById('result-message');
+    messageEl.className = 'result-message';
+
+    if (isMockExamMode) {
+        const isPassed = rate >= PASS_RATE;
+        if (isPassed) {
+            if (rate >= 90) {
+                messageEl.classList.add('excellent');
+                messageEl.textContent = '素晴らしい！高得点で合格です！';
+            } else if (rate >= 70) {
+                messageEl.classList.add('good');
+                messageEl.textContent = '合格です！良い成績です！';
+            } else {
+                messageEl.classList.add('pass');
+                messageEl.textContent = '合格です！引き続き学習を続けましょう！';
+            }
+        } else {
+            messageEl.classList.add('fail');
+            messageEl.textContent = `不合格です。合格まであと${Math.ceil(total * PASS_RATE / 100) - correctCount}問必要です。`;
+        }
+    } else {
+        if (rate >= 90) {
+            messageEl.classList.add('excellent');
+            messageEl.textContent = '素晴らしい！ほぼ完璧です！';
+        } else if (rate >= 70) {
+            messageEl.classList.add('good');
+            messageEl.textContent = '良い成績です！合格ラインクリア！';
+        } else if (rate >= 60) {
+            messageEl.classList.add('pass');
+            messageEl.textContent = 'もう少しで合格ライン！頑張りましょう！';
+        } else {
+            messageEl.classList.add('fail');
+            messageEl.textContent = '復習が必要です。繰り返し学習しましょう！';
+        }
+    }
+
+    // 間違えた問題の数を表示
+    const wrongCount = userAnswers.filter(a => !a.isCorrect).length;
+    document.getElementById('wrong-in-session').textContent = wrongCount;
+
+    showScreen('result-screen');
+    window.scrollTo(0, 0);
+
+    // 模擬試験モードをリセット
+    isMockExamMode = false;
+    mockExamType = null;
+    mockExamStartTime = null;
+};
+
+// =====================
+// スワイプナビゲーション
+// =====================
+(function() {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+    const minSwipeDistance = 80;
+    const maxVerticalDistance = 100;
+    let swipeHintShown = false;
+
+    function createSwipeHint() {
+        if (document.querySelector('.swipe-hint')) return;
+        const hint = document.createElement('div');
+        hint.className = 'swipe-hint';
+        hint.innerHTML = '左にスワイプで次の問題へ';
+        document.body.appendChild(hint);
+    }
+
+    function showSwipeHint() {
+        if (swipeHintShown) return;
+        const hint = document.querySelector('.swipe-hint');
+        if (hint) {
+            hint.classList.add('show');
+            setTimeout(() => hint.classList.remove('show'), 3000);
+            swipeHintShown = true;
+            localStorage.setItem('swipeHintShown', 'true');
+        }
+    }
+
+    function initSwipeHint() {
+        createSwipeHint();
+        if (!localStorage.getItem('swipeHintShown')) {
+            setTimeout(showSwipeHint, 2000);
+        } else {
+            swipeHintShown = true;
+        }
+    }
+
+    function handleSwipe() {
+        const quizScreen = document.getElementById('quiz-screen');
+        if (!quizScreen || !quizScreen.classList.contains('active')) return;
+
+        const diffX = touchStartX - touchEndX;
+        const diffY = Math.abs(touchStartY - touchEndY);
+
+        if (diffY > maxVerticalDistance) return;
+
+        if (diffX > minSwipeDistance) {
+            const nextBtn = document.getElementById('next-btn');
+            if (nextBtn && !nextBtn.classList.contains('hidden')) {
+                nextBtn.click();
+            }
+        }
+    }
+
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+        handleSwipe();
+    }, { passive: true });
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSwipeHint);
+    } else {
+        initSwipeHint();
+    }
+})();
+

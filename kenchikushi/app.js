@@ -8,6 +8,8 @@ let timerInterval = null;
 let timeRemaining = 0;
 let isTimerMode = false;
 let selectedSession = null;
+let isWrongReviewMode = false;  // 復習モードフラグ
+let wrongAnswersData = {};      // 復習時の間違い履歴データ
 
 // LocalStorage キー基底 (建築士用) - ユーザープレフィックスは UserManager が付与
 const STORAGE_BASE_KEYS = {
@@ -15,7 +17,17 @@ const STORAGE_BASE_KEYS = {
     stats: 'stats_kenchikushi',
     bookmarks: 'bookmarks_kenchikushi',
     history: 'history_kenchikushi',
-    categoryStats: 'category_stats_kenchikushi'
+    categoryStats: 'category_stats_kenchikushi',
+    adaptiveLearning: 'adaptive_kenchikushi'
+};
+
+// 適応型学習の設定
+const ADAPTIVE_CONFIG = {
+    consecutiveCorrectToMaster: 3,  // 連続正解でマスター判定
+    masterCooldownDays: 7,          // マスター後の出題抑制日数
+    wrongPriorityWeight: 3,         // 間違い問題の優先度重み
+    recentWrongBoost: 2,            // 最近間違えた問題のブースト
+    recentWrongDays: 3              // 「最近」の定義（日数）
 };
 
 // ダークモードは共通設定
@@ -67,6 +79,9 @@ function saveWrongAnswer(questionId) {
     wrongAnswers[questionId].count++;
     wrongAnswers[questionId].lastWrong = new Date().toISOString();
     UserManager.setUserData(STORAGE_BASE_KEYS.wrongAnswers, wrongAnswers);
+
+    // 適応型学習データを更新（間違い）
+    updateAdaptiveLearning(questionId, false);
 }
 
 // 正解した問題を記録（間違い回数を減らす）
@@ -80,6 +95,143 @@ function recordCorrectAnswer(questionId) {
         }
         UserManager.setUserData(STORAGE_BASE_KEYS.wrongAnswers, wrongAnswers);
     }
+
+    // 適応型学習データを更新
+    updateAdaptiveLearning(questionId, true);
+}
+
+// =====================
+// 適応型学習システム
+// =====================
+
+// 適応型学習データを取得
+function getAdaptiveLearning() {
+    return UserManager.getUserData(STORAGE_BASE_KEYS.adaptiveLearning, {});
+}
+
+// 適応型学習データを更新
+function updateAdaptiveLearning(questionId, isCorrect) {
+    const adaptive = getAdaptiveLearning();
+
+    if (!adaptive[questionId]) {
+        adaptive[questionId] = {
+            consecutiveCorrect: 0,
+            lastAnswered: null,
+            masteredAt: null,
+            totalCorrect: 0,
+            totalAttempts: 0
+        };
+    }
+
+    const data = adaptive[questionId];
+    data.totalAttempts++;
+    data.lastAnswered = new Date().toISOString();
+
+    if (isCorrect) {
+        data.consecutiveCorrect++;
+        data.totalCorrect++;
+
+        // 連続正解でマスター判定
+        if (data.consecutiveCorrect >= ADAPTIVE_CONFIG.consecutiveCorrectToMaster) {
+            data.masteredAt = new Date().toISOString();
+        }
+    } else {
+        // 間違えたら連続正解リセット、マスター解除
+        data.consecutiveCorrect = 0;
+        data.masteredAt = null;
+    }
+
+    UserManager.setUserData(STORAGE_BASE_KEYS.adaptiveLearning, adaptive);
+}
+
+// 問題がマスター済みかチェック（クールダウン期間内）
+function isQuestionMastered(questionId) {
+    const adaptive = getAdaptiveLearning();
+    const data = adaptive[questionId];
+
+    if (!data || !data.masteredAt) return false;
+
+    const masteredDate = new Date(data.masteredAt);
+    const cooldownEnd = new Date(masteredDate);
+    cooldownEnd.setDate(cooldownEnd.getDate() + ADAPTIVE_CONFIG.masterCooldownDays);
+
+    return new Date() < cooldownEnd;
+}
+
+// 問題の優先度スコアを計算
+function calculateQuestionPriority(question) {
+    const wrongAnswers = getWrongAnswers();
+    const adaptive = getAdaptiveLearning();
+    const categoryStats = getCategoryStats();
+
+    let score = 100; // ベーススコア
+
+    const questionId = question.id;
+    const wrongData = wrongAnswers[questionId];
+    const adaptiveData = adaptive[questionId];
+    const category = question.type || '未分類';
+    const catStats = categoryStats[category];
+
+    // 間違い回数による優先度アップ
+    if (wrongData) {
+        score += wrongData.count * ADAPTIVE_CONFIG.wrongPriorityWeight * 10;
+
+        // 最近間違えた問題はさらにブースト
+        if (wrongData.lastWrong) {
+            const daysSinceWrong = (new Date() - new Date(wrongData.lastWrong)) / (1000 * 60 * 60 * 24);
+            if (daysSinceWrong <= ADAPTIVE_CONFIG.recentWrongDays) {
+                score += ADAPTIVE_CONFIG.recentWrongBoost * 20;
+            }
+        }
+    }
+
+    // 苦手分野の問題は優先度アップ
+    if (catStats && catStats.total >= 3) {
+        const accuracy = catStats.correct / catStats.total;
+        if (accuracy < 0.5) {
+            score += (0.5 - accuracy) * 50;
+        }
+    }
+
+    // マスター済みの問題は優先度ダウン
+    if (isQuestionMastered(questionId)) {
+        score -= 80;
+    }
+
+    // 連続正解中の問題は少し優先度ダウン
+    if (adaptiveData && adaptiveData.consecutiveCorrect > 0) {
+        score -= adaptiveData.consecutiveCorrect * 10;
+    }
+
+    // 未回答の問題は少し優先度アップ
+    if (!adaptiveData || adaptiveData.totalAttempts === 0) {
+        score += 20;
+    }
+
+    return score;
+}
+
+// スマート問題選択（適応型学習ベース）
+function selectQuestionsAdaptively(questions, count) {
+    // 優先度スコアを計算
+    const scoredQuestions = questions.map(q => ({
+        question: q,
+        score: calculateQuestionPriority(q),
+        random: Math.random() // ランダム要素を追加
+    }));
+
+    // スコアでソート（高い順）、同点はランダム
+    scoredQuestions.sort((a, b) => {
+        const scoreDiff = b.score - a.score;
+        if (Math.abs(scoreDiff) < 10) {
+            return a.random - b.random;
+        }
+        return scoreDiff;
+    });
+
+    // 上位からcount件を選択し、シャッフル
+    const selected = scoredQuestions.slice(0, count).map(sq => sq.question);
+    return shuffleArray(selected);
 }
 
 // ブックマークを取得
@@ -450,22 +602,40 @@ function startQuiz(mode, withTimer = false) {
 
     switch (mode) {
         case 'all':
-            currentQuestions = questions;
+            // 全問題モードでもシャッフル
+            currentQuestions = shuffleArray(questions);
             break;
         case 'random':
-            currentQuestions = shuffleArray(questions).slice(0, 20);
+            // 適応型学習で賢く選択
+            currentQuestions = selectQuestionsAdaptively(questions, 20);
+            break;
+        case 'smart':
+            // スマート学習モード（苦手問題優先）
+            currentQuestions = selectQuestionsAdaptively(questions, Math.min(30, questions.length));
             break;
         case 'wrong':
             const wrongAnswers = getWrongAnswers();
             const wrongIds = Object.keys(wrongAnswers).map(id => parseInt(id));
             currentQuestions = questions.filter(q => wrongIds.includes(q.id));
+            // 間違い回数が多い順 + 最近間違えた順でソート後シャッフル
             currentQuestions.sort((a, b) => {
-                return (wrongAnswers[b.id]?.count || 0) - (wrongAnswers[a.id]?.count || 0);
+                const countDiff = (wrongAnswers[b.id]?.count || 0) - (wrongAnswers[a.id]?.count || 0);
+                if (countDiff !== 0) return countDiff;
+                // 同じ回数なら最近間違えた順
+                const aDate = wrongAnswers[a.id]?.lastWrong ? new Date(wrongAnswers[a.id].lastWrong) : new Date(0);
+                const bDate = wrongAnswers[b.id]?.lastWrong ? new Date(wrongAnswers[b.id].lastWrong) : new Date(0);
+                return bDate - aDate;
             });
+            // 上位50%をシャッフル（順番を少し変える）
+            const halfLength = Math.ceil(currentQuestions.length / 2);
+            const topHalf = shuffleArray(currentQuestions.slice(0, halfLength));
+            const bottomHalf = currentQuestions.slice(halfLength);
+            currentQuestions = [...topHalf, ...bottomHalf];
             break;
         case 'bookmark':
             const bookmarks = getBookmarks();
             currentQuestions = questions.filter(q => bookmarks.includes(q.id));
+            currentQuestions = shuffleArray(currentQuestions);
             break;
     }
 
@@ -613,6 +783,263 @@ function formatExplanation(text) {
     return formatted;
 }
 
+// =====================
+// 復習モード強化機能
+// =====================
+
+// 復習モード時の間違い回数バッジを表示
+function displayWrongReviewBadge(question) {
+    // 既存のバッジを削除
+    const existingBadge = document.getElementById('wrong-review-badge');
+    if (existingBadge) {
+        existingBadge.remove();
+    }
+
+    // 既存のヒントを削除
+    const existingHint = document.getElementById('review-hint');
+    if (existingHint) {
+        existingHint.remove();
+    }
+
+    if (!isWrongReviewMode) return;
+
+    const wrongData = wrongAnswersData[question.id];
+    if (!wrongData) return;
+
+    // 間違い回数バッジを作成
+    const badge = document.createElement('div');
+    badge.id = 'wrong-review-badge';
+    badge.className = 'wrong-review-badge';
+
+    const wrongCount = wrongData.count || 0;
+    let urgencyClass = '';
+    let urgencyText = '';
+
+    if (wrongCount >= 3) {
+        urgencyClass = 'high-priority';
+        urgencyText = '要注意';
+    } else if (wrongCount >= 2) {
+        urgencyClass = 'medium-priority';
+        urgencyText = '復習推奨';
+    } else {
+        urgencyClass = 'low-priority';
+        urgencyText = '確認';
+    }
+
+    badge.classList.add(urgencyClass);
+    badge.innerHTML = `
+        <span class="badge-icon">&#128270;</span>
+        <span class="badge-text">${urgencyText}: ${wrongCount}回間違い</span>
+    `;
+
+    // バッジを問題番号の近くに挿入
+    const questionHeader = document.querySelector('.question-header') || document.querySelector('.quiz-header');
+    if (questionHeader) {
+        questionHeader.appendChild(badge);
+    }
+
+    // 間違えやすいポイントのヒントを表示
+    displayReviewHint(question, wrongData);
+}
+
+// 間違えやすいポイントのヒントを表示
+function displayReviewHint(question, wrongData) {
+    const hintContainer = document.createElement('div');
+    hintContainer.id = 'review-hint';
+    hintContainer.className = 'review-hint';
+
+    const wrongCount = wrongData.count || 0;
+    const lastWrong = wrongData.lastWrong ? new Date(wrongData.lastWrong) : null;
+
+    let hintText = '';
+    let tipsList = [];
+
+    // 間違い回数に応じたメッセージ
+    if (wrongCount >= 3) {
+        hintText = 'この問題は複数回間違えています。';
+        tipsList.push('解説をよく読んで、なぜ間違えたか考えましょう');
+        tipsList.push('選択肢の違いを明確に理解することが重要です');
+    } else if (wrongCount >= 2) {
+        hintText = 'この問題は以前も間違えています。';
+        tipsList.push('前回の間違いを思い出して慎重に解答しましょう');
+    } else {
+        hintText = 'この問題で一度間違えています。';
+        tipsList.push('落ち着いて問題文を読みましょう');
+    }
+
+    // 最後に間違えた日時
+    let lastWrongText = '';
+    if (lastWrong) {
+        const now = new Date();
+        const diffDays = Math.floor((now - lastWrong) / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) {
+            lastWrongText = '今日間違えました';
+        } else if (diffDays === 1) {
+            lastWrongText = '昨日間違えました';
+        } else if (diffDays < 7) {
+            lastWrongText = `${diffDays}日前に間違えました`;
+        } else {
+            lastWrongText = `${Math.floor(diffDays / 7)}週間前に間違えました`;
+        }
+    }
+
+    hintContainer.innerHTML = `
+        <div class="hint-header">
+            <span class="hint-icon">&#128161;</span>
+            <span class="hint-title">復習ポイント</span>
+        </div>
+        <div class="hint-content">
+            <p class="hint-message">${hintText}</p>
+            ${lastWrongText ? `<p class="hint-last-wrong">${lastWrongText}</p>` : ''}
+            <ul class="hint-tips">
+                ${tipsList.map(tip => `<li>${tip}</li>`).join('')}
+            </ul>
+        </div>
+    `;
+
+    // ヒントを問題文の前に挿入
+    const questionText = document.getElementById('question-text');
+    if (questionText && questionText.parentNode) {
+        questionText.parentNode.insertBefore(hintContainer, questionText);
+    }
+}
+
+// 復習完了後の傾向分析を生成
+function generateReviewAnalysis() {
+    if (!isWrongReviewMode || userAnswers.length === 0) return null;
+
+    const analysis = {
+        totalReviewed: userAnswers.length,
+        improved: 0,          // 今回正解した問題
+        stillWrong: 0,        // また間違えた問題
+        frequentWrong: [],    // 何度も間違える問題
+        categoryAnalysis: {}, // 分野別分析
+        recommendations: []   // 学習アドバイス
+    };
+
+    userAnswers.forEach(answer => {
+        const question = currentQuestions.find(q => q.id === answer.questionId);
+        if (!question) return;
+
+        const category = question.type || '未分類';
+        if (!analysis.categoryAnalysis[category]) {
+            analysis.categoryAnalysis[category] = { correct: 0, wrong: 0 };
+        }
+
+        if (answer.isCorrect) {
+            analysis.improved++;
+            analysis.categoryAnalysis[category].correct++;
+        } else {
+            analysis.stillWrong++;
+            analysis.categoryAnalysis[category].wrong++;
+
+            // 3回以上間違えている問題を記録
+            const wrongData = wrongAnswersData[answer.questionId];
+            if (wrongData && wrongData.count >= 3) {
+                analysis.frequentWrong.push({
+                    id: answer.questionId,
+                    count: wrongData.count,
+                    category: category
+                });
+            }
+        }
+    });
+
+    // 学習アドバイスを生成
+    const improvementRate = Math.round((analysis.improved / analysis.totalReviewed) * 100);
+
+    if (improvementRate >= 80) {
+        analysis.recommendations.push('素晴らしい改善です！この調子で学習を続けましょう。');
+    } else if (improvementRate >= 60) {
+        analysis.recommendations.push('良い進歩です。まだ間違える問題は重点的に復習しましょう。');
+    } else if (improvementRate >= 40) {
+        analysis.recommendations.push('まだ改善の余地があります。解説をよく読んで理解を深めましょう。');
+    } else {
+        analysis.recommendations.push('基礎からの復習が必要かもしれません。教科書も併せて確認しましょう。');
+    }
+
+    // 苦手分野の特定
+    const weakCategories = Object.entries(analysis.categoryAnalysis)
+        .filter(([_, stats]) => stats.wrong > stats.correct)
+        .map(([name, _]) => name);
+
+    if (weakCategories.length > 0) {
+        analysis.recommendations.push(`特に「${weakCategories.join('」「')}」の分野を重点的に学習しましょう。`);
+    }
+
+    if (analysis.frequentWrong.length > 0) {
+        analysis.recommendations.push(`問題${analysis.frequentWrong.map(q => q.id).join(', ')}は何度も間違えています。解説を印刷して覚えることをお勧めします。`);
+    }
+
+    return analysis;
+}
+
+// 復習完了後の傾向分析を表示
+function displayReviewAnalysis() {
+    const analysis = generateReviewAnalysis();
+    if (!analysis) return;
+
+    const container = document.getElementById('result-weak-analysis');
+    if (!container) return;
+
+    const improvementRate = Math.round((analysis.improved / analysis.totalReviewed) * 100);
+
+    // 分析結果HTMLを生成
+    const analysisHTML = `
+        <div class="review-analysis">
+            <div class="analysis-header">
+                <span class="analysis-icon">&#128200;</span>
+                <span class="analysis-title">復習結果の分析</span>
+            </div>
+
+            <div class="analysis-summary">
+                <div class="summary-item improvement">
+                    <span class="summary-label">改善率</span>
+                    <span class="summary-value ${improvementRate >= 70 ? 'good' : improvementRate >= 50 ? 'moderate' : 'needs-work'}">${improvementRate}%</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">正解（改善）</span>
+                    <span class="summary-value">${analysis.improved}問</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">不正解（要継続）</span>
+                    <span class="summary-value">${analysis.stillWrong}問</span>
+                </div>
+            </div>
+
+            ${analysis.frequentWrong.length > 0 ? `
+                <div class="frequent-wrong-section">
+                    <div class="section-header">
+                        <span class="warning-icon">&#9888;</span>
+                        <span>繰り返し間違える問題</span>
+                    </div>
+                    <ul class="frequent-wrong-list">
+                        ${analysis.frequentWrong.map(q => `
+                            <li>問題 ${q.id}（${q.category}）- ${q.count}回間違い</li>
+                        `).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+
+            <div class="recommendations-section">
+                <div class="section-header">
+                    <span class="bulb-icon">&#128161;</span>
+                    <span>学習アドバイス</span>
+                </div>
+                <ul class="recommendations-list">
+                    ${analysis.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                </ul>
+            </div>
+        </div>
+    `;
+
+    // 既存の分析の前に挿入
+    container.insertAdjacentHTML('afterbegin', analysisHTML);
+}
+
+// 現在の問題の選択肢マッピング（シャッフル対応）
+let currentChoiceMapping = [];
+
 function displayQuestion() {
     const question = currentQuestions[currentIndex];
 
@@ -633,6 +1060,9 @@ function displayQuestion() {
         sessionBadge.textContent = question.type || '問題';
     }
 
+    // 復習モード時の間違い回数バッジ表示
+    displayWrongReviewBadge(question);
+
     if (isMultipleChoiceQuestion(question.question)) {
         const parsed = parseMultipleChoiceQuestion(question.question);
         questionText.innerHTML = formatText(parsed.questionBody);
@@ -640,14 +1070,19 @@ function displayQuestion() {
         choicesContainer.innerHTML = '';
         choicesContainer.classList.remove('hidden');
 
-        parsed.choices.forEach(choice => {
+        // 選択肢をシャッフル
+        const shuffledChoices = shuffleChoices(parsed.choices);
+        currentChoiceMapping = shuffledChoices.map(c => c.originalNumber);
+
+        shuffledChoices.forEach((choice, displayIndex) => {
             const btn = document.createElement('button');
             btn.className = 'choice-btn';
             btn.innerHTML = `
-                <span class="choice-number">${choice.number}</span>
+                <span class="choice-number">${displayIndex + 1}</span>
                 <span class="choice-text">${formatText(choice.text)}</span>
             `;
-            btn.onclick = () => selectAnswer(choice.number, true);
+            btn.dataset.originalNumber = choice.originalNumber;
+            btn.onclick = () => selectAnswer(choice.originalNumber, true, displayIndex + 1);
             choicesContainer.appendChild(btn);
         });
 
@@ -659,6 +1094,7 @@ function displayQuestion() {
         questionText.innerHTML = formatText(question.question);
         choicesContainer.innerHTML = '';
         choicesContainer.classList.add('hidden');
+        currentChoiceMapping = [];
 
         const showAnswerBtn = document.getElementById('show-answer-btn');
         if (showAnswerBtn) {
@@ -678,6 +1114,20 @@ function displayQuestion() {
     if (answerSection) {
         answerSection.classList.add('hidden');
     }
+}
+
+// 選択肢をシャッフルする関数
+function shuffleChoices(choices) {
+    const shuffled = choices.map(c => ({
+        originalNumber: c.number,
+        text: c.text
+    }));
+    // Fisher-Yatesシャッフル
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
 }
 
 function showAnswer() {
@@ -739,7 +1189,7 @@ function markWrong() {
     nextQuestion();
 }
 
-function selectAnswer(selected, isQuizMode = false) {
+function selectAnswer(selected, isQuizMode = false, displayNumber = null) {
     const question = currentQuestions[currentIndex];
     const correctAnswer = extractCorrectAnswer(question.answer);
     const isCorrect = selected === correctAnswer;
@@ -769,13 +1219,18 @@ function selectAnswer(selected, isQuizMode = false) {
         btn.classList.add('disabled');
         btn.onclick = null;
 
-        if (index + 1 === correctAnswer) {
+        const originalNum = parseInt(btn.dataset.originalNumber) || (index + 1);
+
+        // 正解の選択肢をハイライト
+        if (originalNum === correctAnswer) {
             btn.classList.add('correct');
-        } else if (index + 1 === selected && !isCorrect) {
+        }
+        // 間違いで選択した選択肢をハイライト
+        if (originalNum === selected && !isCorrect) {
             btn.classList.add('wrong');
         }
-
-        if (index + 1 === selected) {
+        // 選択した選択肢をマーク
+        if (originalNum === selected) {
             btn.classList.add('selected');
         }
     });
@@ -904,8 +1359,17 @@ function showResult() {
     // 苦手分野分析を表示
     displayWeakCategoryAnalysis();
 
+    // 復習モード時は傾向分析を表示
+    if (isWrongReviewMode) {
+        displayReviewAnalysis();
+    }
+
     showScreen('result-screen');
     window.scrollTo(0, 0);
+
+    // 復習モードをリセット
+    isWrongReviewMode = false;
+    wrongAnswersData = {};
 }
 
 // 苦手分野分析を結果画面に表示
@@ -1153,6 +1617,7 @@ function getModeLabel(mode) {
     const labels = {
         'all': '全問題',
         'random': 'ランダム',
+        'smart': 'スマート学習',
         'wrong': '復習',
         'bookmark': 'ブックマーク',
         'weak_area': '苦手分野'
@@ -1162,12 +1627,13 @@ function getModeLabel(mode) {
 
 function resetAllData() {
     const currentUser = UserManager.getCurrentUser();
-    if (confirm(`${currentUser}さんの学習データをリセットしますか？\n（間違い記録、統計、ブックマーク、分野別統計が削除されます）`)) {
+    if (confirm(`${currentUser}さんの学習データをリセットしますか？\n（間違い記録、統計、ブックマーク、分野別統計、適応型学習データが削除されます）`)) {
         UserManager.removeUserData(STORAGE_BASE_KEYS.wrongAnswers);
         UserManager.removeUserData(STORAGE_BASE_KEYS.stats);
         UserManager.removeUserData(STORAGE_BASE_KEYS.bookmarks);
         UserManager.removeUserData(STORAGE_BASE_KEYS.history);
         UserManager.removeUserData(STORAGE_BASE_KEYS.categoryStats);
+        UserManager.removeUserData(STORAGE_BASE_KEYS.adaptiveLearning);
         alert('データをリセットしました');
         goHome();
     }
@@ -1195,6 +1661,10 @@ function goHome() {
 }
 
 function startWrongReview() {
+    // 復習モードフラグを設定
+    isWrongReviewMode = true;
+    // 間違い履歴データを保存（復習中に参照するため）
+    wrongAnswersData = getWrongAnswers();
     startQuiz('wrong', false);
 }
 
@@ -1359,3 +1829,88 @@ document.addEventListener('keydown', (e) => {
         goHome();
     }
 });
+
+// =====================
+// スワイプナビゲーション
+// =====================
+(function() {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+    const minSwipeDistance = 80;
+    const maxVerticalDistance = 100;
+    let swipeHintShown = false;
+
+    // スワイプヒント要素を作成
+    function createSwipeHint() {
+        if (document.querySelector('.swipe-hint')) return;
+        const hint = document.createElement('div');
+        hint.className = 'swipe-hint';
+        hint.innerHTML = '左にスワイプで次の問題へ';
+        document.body.appendChild(hint);
+    }
+
+    // スワイプヒントを表示
+    function showSwipeHint() {
+        if (swipeHintShown) return;
+        const hint = document.querySelector('.swipe-hint');
+        if (hint) {
+            hint.classList.add('show');
+            setTimeout(() => {
+                hint.classList.remove('show');
+            }, 3000);
+            swipeHintShown = true;
+            localStorage.setItem('swipeHintShown', 'true');
+        }
+    }
+
+    // 初回時にスワイプヒントを表示
+    function initSwipeHint() {
+        createSwipeHint();
+        if (!localStorage.getItem('swipeHintShown')) {
+            setTimeout(showSwipeHint, 2000);
+        } else {
+            swipeHintShown = true;
+        }
+    }
+
+    // スワイプ処理
+    function handleSwipe() {
+        const quizScreen = document.getElementById('quiz-screen');
+        if (!quizScreen || !quizScreen.classList.contains('active')) return;
+
+        const diffX = touchStartX - touchEndX;
+        const diffY = Math.abs(touchStartY - touchEndY);
+
+        // 垂直方向の移動が大きい場合はスクロールと判断
+        if (diffY > maxVerticalDistance) return;
+
+        // 左スワイプ（次の問題へ）
+        if (diffX > minSwipeDistance) {
+            const nextBtn = document.getElementById('next-btn');
+            if (nextBtn && !nextBtn.classList.contains('hidden')) {
+                nextBtn.click();
+            }
+        }
+    }
+
+    // タッチイベント
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+        handleSwipe();
+    }, { passive: true });
+
+    // 初期化
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSwipeHint);
+    } else {
+        initSwipeHint();
+    }
+})();

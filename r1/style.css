@@ -1730,3 +1730,328 @@ body.dark-mode .history-rate.fail {
     font-size: 0.75rem;
     font-weight: 600;
 }
+
+/* =====================
+   モバイル最適化スタイル
+   ===================== */
+
+/* タッチ操作の改善 - タップ領域を大きく */
+.btn {
+    min-height: 48px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.choice-btn {
+    min-height: 56px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.filter-btn,
+.session-btn,
+.countdown-btn {
+    min-height: 44px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.home-btn,
+.bookmark-btn,
+.dark-mode-btn {
+    min-width: 48px;
+    min-height: 48px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+/* スワイプヒント表示 */
+.swipe-hint {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 30px;
+    font-size: 0.9rem;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.swipe-hint.show {
+    opacity: 1;
+}
+
+/* スワイプインジケーター */
+.swipe-indicator {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 80px;
+    background: rgba(37, 99, 235, 0.2);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: var(--primary-color);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.swipe-indicator.left {
+    left: 10px;
+}
+
+.swipe-indicator.right {
+    right: 10px;
+}
+
+.swipe-indicator.show {
+    opacity: 1;
+}
+
+/* PWA対応 - セーフエリア */
+.container {
+    padding-top: max(20px, env(safe-area-inset-top));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+}
+
+/* モバイル向けレスポンシブ強化 */
+@media (max-width: 600px) {
+    /* 文字サイズの調整 */
+    body {
+        font-size: 16px;
+        -webkit-text-size-adjust: 100%;
+    }
+
+    #start-screen .header {
+        padding: 30px 16px;
+    }
+
+    #start-screen .header h1 {
+        font-size: 1.3rem;
+        line-height: 1.4;
+    }
+
+    #start-screen .header h2 {
+        font-size: 1rem;
+    }
+
+    .question-text {
+        font-size: 1rem;
+        line-height: 1.9;
+    }
+
+    /* 選択肢の間隔を広げてタップしやすく */
+    .choices {
+        gap: 16px;
+    }
+
+    .choice-btn {
+        padding: 18px 16px;
+        min-height: 64px;
+        border-radius: 14px;
+    }
+
+    .choice-number {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+    }
+
+    .choice-text {
+        font-size: 1rem;
+        line-height: 1.7;
+        padding-top: 6px;
+    }
+
+    /* ボタンの改善 */
+    .btn {
+        padding: 18px 20px;
+        font-size: 1rem;
+        border-radius: 14px;
+        min-height: 56px;
+    }
+
+    .btn-small {
+        padding: 12px 18px;
+        min-height: 44px;
+    }
+
+    .filter-btn {
+        padding: 14px 18px;
+        min-height: 48px;
+    }
+
+    .session-btn {
+        padding: 14px 18px;
+        min-height: 48px;
+    }
+
+    /* 復習ボタンの改善 */
+    .review-buttons {
+        gap: 16px;
+    }
+
+    .review-buttons .btn {
+        min-height: 72px;
+    }
+
+    /* タイマーボタンの改善 */
+    .timer-buttons {
+        gap: 12px;
+    }
+
+    .timer-buttons .btn {
+        min-height: 56px;
+    }
+
+    /* カードの余白調整 */
+    .exam-info,
+    .mode-selection,
+    .session-filter,
+    .review-section,
+    .weakness-analysis,
+    .timer-mode-section,
+    .mock-exam-section {
+        padding: 20px 16px;
+        border-radius: 14px;
+    }
+
+    .question-card {
+        padding: 20px 16px;
+        border-radius: 14px;
+    }
+
+    /* フィードバックの改善 */
+    .feedback {
+        padding: 24px 16px;
+    }
+
+    .feedback-icon {
+        font-size: 3.5rem;
+    }
+
+    .feedback-text {
+        font-size: 1.3rem;
+    }
+
+    /* 次の問題ボタンを大きく */
+    .quiz-controls .btn {
+        padding: 18px 36px;
+        font-size: 1.1rem;
+        min-height: 60px;
+    }
+
+    /* プログレスバーを太く */
+    .progress-bar {
+        height: 10px;
+    }
+
+    /* 統計画面の改善 */
+    .stats-item {
+        padding: 16px 12px;
+    }
+
+    .stats-label {
+        font-size: 0.7rem;
+    }
+
+    .stats-value {
+        font-size: 1.1rem;
+    }
+
+    /* カテゴリ統計の改善 */
+    .category-item {
+        padding: 16px;
+    }
+
+    .category-name {
+        font-size: 1rem;
+    }
+
+    /* 結果画面の改善 */
+    .result-card {
+        padding: 24px 16px;
+    }
+
+    .score-circle {
+        width: 140px;
+        height: 140px;
+    }
+
+    .score-circle #final-score {
+        font-size: 2.8rem;
+    }
+
+    .result-actions {
+        padding: 20px 16px;
+    }
+
+    .result-actions .btn {
+        margin-bottom: 14px;
+    }
+}
+
+/* 非常に小さい画面向け */
+@media (max-width: 380px) {
+    #start-screen .header h1 {
+        font-size: 1.1rem;
+    }
+
+    .stats-summary {
+        gap: 6px;
+    }
+
+    .stats-item {
+        padding: 12px 8px;
+    }
+
+    .choice-btn {
+        padding: 16px 12px;
+    }
+
+    .choice-number {
+        width: 32px;
+        height: 32px;
+    }
+}
+
+/* 横向き対応 */
+@media (max-height: 500px) and (orientation: landscape) {
+    .container {
+        padding-top: 12px;
+        padding-bottom: 12px;
+    }
+
+    #start-screen .header {
+        padding: 20px;
+    }
+
+    .quiz-header {
+        padding: 12px 16px;
+    }
+
+    .question-card {
+        padding: 16px;
+    }
+
+    .choices {
+        gap: 10px;
+    }
+
+    .choice-btn {
+        min-height: 48px;
+        padding: 12px;
+    }
+}

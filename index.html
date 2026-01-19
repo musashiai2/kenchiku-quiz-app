@@ -542,6 +542,463 @@
             color: var(--text-light);
         }
 
+        /* ===================== */
+        /* Learning Reminder Styles */
+        /* ===================== */
+        .learning-reminder {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .reminder-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .reminder-header h2 {
+            color: var(--primary-color);
+            font-size: 1.3rem;
+        }
+
+        .reminder-icon {
+            font-size: 1.5rem;
+        }
+
+        .reminder-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .reminder-card {
+            background: var(--bg-color);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .days-since-last {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+        }
+
+        .days-since-last.warning {
+            color: var(--warning-color);
+        }
+
+        .days-since-last.danger {
+            color: var(--danger-color);
+        }
+
+        .days-since-last.good {
+            color: var(--secondary-color);
+        }
+
+        .reminder-label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        .reminder-message {
+            font-size: 0.85rem;
+            color: var(--text-color);
+            margin-top: 12px;
+            padding: 10px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            border-left: 3px solid var(--primary-color);
+        }
+
+        /* Daily Goal */
+        .daily-goal {
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            border-radius: 16px;
+            color: white;
+        }
+
+        .daily-goal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .daily-goal-title {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .daily-goal-setting {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .daily-goal-setting select {
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .daily-goal-setting select option {
+            color: var(--text-color);
+            background: var(--card-bg);
+        }
+
+        .daily-goal-progress {
+            margin-top: 12px;
+        }
+
+        .daily-goal-bar {
+            height: 12px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .daily-goal-fill {
+            height: 100%;
+            background: white;
+            border-radius: 6px;
+            transition: width 0.3s ease;
+        }
+
+        .daily-goal-text {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+
+        /* ===================== */
+        /* Learning Calendar Styles */
+        /* ===================== */
+        .learning-calendar {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .calendar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .calendar-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .calendar-header h2 {
+            color: var(--primary-color);
+            font-size: 1.3rem;
+        }
+
+        .calendar-icon {
+            font-size: 1.5rem;
+        }
+
+        .streak-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, var(--warning-color), #d97706);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .streak-badge .fire {
+            font-size: 1.2rem;
+        }
+
+        .calendar-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .calendar-months {
+            display: flex;
+            padding-left: 30px;
+            margin-bottom: 8px;
+        }
+
+        .calendar-month {
+            flex: 1;
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+
+        .calendar-week-labels {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-right: 4px;
+        }
+
+        .calendar-week-label {
+            height: 14px;
+            font-size: 0.65rem;
+            color: var(--text-light);
+            display: flex;
+            align-items: center;
+        }
+
+        .calendar-container {
+            display: flex;
+            gap: 4px;
+        }
+
+        .calendar-weeks {
+            display: flex;
+            gap: 3px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+        }
+
+        .calendar-week {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .calendar-day {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            background: var(--bg-color);
+            transition: all 0.2s ease;
+        }
+
+        .calendar-day:hover {
+            transform: scale(1.3);
+            box-shadow: var(--shadow);
+        }
+
+        .calendar-day.level-0 {
+            background: var(--bg-color);
+        }
+
+        .calendar-day.level-1 {
+            background: #9be9a8;
+        }
+
+        .calendar-day.level-2 {
+            background: #40c463;
+        }
+
+        .calendar-day.level-3 {
+            background: #30a14e;
+        }
+
+        .calendar-day.level-4 {
+            background: #216e39;
+        }
+
+        body.dark-mode .calendar-day.level-0 {
+            background: var(--border-color);
+        }
+
+        body.dark-mode .calendar-day.level-1 {
+            background: #0e4429;
+        }
+
+        body.dark-mode .calendar-day.level-2 {
+            background: #006d32;
+        }
+
+        body.dark-mode .calendar-day.level-3 {
+            background: #26a641;
+        }
+
+        body.dark-mode .calendar-day.level-4 {
+            background: #39d353;
+        }
+
+        .calendar-legend {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            margin-top: 12px;
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+
+        .legend-item {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+        }
+
+        .calendar-tooltip {
+            position: fixed;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            box-shadow: var(--shadow-lg);
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+        }
+
+        /* ===================== */
+        /* Achievement Badge Styles */
+        /* ===================== */
+        .achievements {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .achievements-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .achievements-header h2 {
+            color: var(--primary-color);
+            font-size: 1.3rem;
+        }
+
+        .achievements-icon {
+            font-size: 1.5rem;
+        }
+
+        .badges-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+        }
+
+        .badge-card {
+            background: var(--bg-color);
+            border-radius: 16px;
+            padding: 20px 16px;
+            text-align: center;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .badge-card.unlocked {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(139, 92, 246, 0.1));
+            border: 2px solid var(--primary-color);
+        }
+
+        .badge-card.locked {
+            opacity: 0.5;
+            filter: grayscale(0.8);
+        }
+
+        .badge-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .badge-emoji {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .badge-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-color);
+            margin-bottom: 4px;
+        }
+
+        .badge-description {
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+
+        .badge-progress {
+            margin-top: 10px;
+            font-size: 0.7rem;
+            color: var(--primary-color);
+        }
+
+        .badge-checkmark {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--secondary-color);
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+        }
+
+        /* Motivation Message */
+        .motivation-message {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: center;
+            border-left: 4px solid var(--warning-color);
+        }
+
+        body.dark-mode .motivation-message {
+            background: linear-gradient(135deg, #451a03, #78350f);
+        }
+
+        .motivation-emoji {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .motivation-text {
+            font-size: 1rem;
+            color: var(--text-color);
+            font-weight: 500;
+        }
+
+        .motivation-subtext {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 8px;
+        }
+
         @media (max-width: 600px) {
             .header h1 {
                 font-size: 1.5rem;
@@ -566,6 +1023,24 @@
             .overall-stat-value {
                 font-size: 1.5rem;
             }
+
+            .reminder-content {
+                grid-template-columns: 1fr;
+            }
+
+            .calendar-header {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .calendar-weeks {
+                overflow-x: auto;
+                padding-bottom: 8px;
+            }
+
+            .badges-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
     </style>
 </head>
@@ -579,6 +1054,104 @@
             <h1>資格試験クイズアプリ</h1>
             <p>建築・不動産・会計・メンタルヘルス関連資格</p>
             <span class="badge">複数資格対応</span>
+        </div>
+
+        <!-- Learning Reminder Section -->
+        <div class="learning-reminder" id="learning-reminder">
+            <div class="reminder-header">
+                <span class="reminder-icon">🔔</span>
+                <h2>学習リマインダー</h2>
+            </div>
+            <div class="reminder-content">
+                <div class="reminder-card">
+                    <div class="days-since-last" id="days-since-last">--</div>
+                    <div class="reminder-label">前回の学習から</div>
+                    <div class="reminder-message" id="reminder-message">学習を始めましょう!</div>
+                </div>
+                <div class="reminder-card">
+                    <div class="days-since-last good" id="today-progress">0</div>
+                    <div class="reminder-label">今日の学習問題数</div>
+                </div>
+            </div>
+            <div class="daily-goal">
+                <div class="daily-goal-header">
+                    <span class="daily-goal-title">今日の目標</span>
+                    <div class="daily-goal-setting">
+                        <select id="daily-goal-select" onchange="updateDailyGoal()">
+                            <option value="10">10問</option>
+                            <option value="20">20問</option>
+                            <option value="30">30問</option>
+                            <option value="50">50問</option>
+                            <option value="100">100問</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="daily-goal-progress">
+                    <div class="daily-goal-bar">
+                        <div class="daily-goal-fill" id="daily-goal-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="daily-goal-text">
+                        <span id="daily-goal-current">0問達成</span>
+                        <span id="daily-goal-remaining">目標まであと--問</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Learning Calendar Section -->
+        <div class="learning-calendar" id="learning-calendar">
+            <div class="calendar-header">
+                <div class="calendar-header-left">
+                    <span class="calendar-icon">📅</span>
+                    <h2>学習カレンダー</h2>
+                </div>
+                <div class="streak-badge" id="streak-badge">
+                    <span class="fire">🔥</span>
+                    <span id="calendar-streak">0日連続</span>
+                </div>
+            </div>
+            <div class="calendar-grid">
+                <div class="calendar-container">
+                    <div class="calendar-week-labels">
+                        <div class="calendar-week-label">日</div>
+                        <div class="calendar-week-label">月</div>
+                        <div class="calendar-week-label">火</div>
+                        <div class="calendar-week-label">水</div>
+                        <div class="calendar-week-label">木</div>
+                        <div class="calendar-week-label">金</div>
+                        <div class="calendar-week-label">土</div>
+                    </div>
+                    <div class="calendar-weeks" id="calendar-weeks">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+            </div>
+            <div class="calendar-legend">
+                <span>少</span>
+                <div class="legend-item level-0"></div>
+                <div class="legend-item level-1"></div>
+                <div class="legend-item level-2"></div>
+                <div class="legend-item level-3"></div>
+                <div class="legend-item level-4"></div>
+                <span>多</span>
+            </div>
+        </div>
+        <div class="calendar-tooltip" id="calendar-tooltip"></div>
+
+        <!-- Achievements Section -->
+        <div class="achievements" id="achievements">
+            <div class="achievements-header">
+                <span class="achievements-icon">🏆</span>
+                <h2>達成バッジ</h2>
+            </div>
+            <div class="badges-grid" id="badges-grid">
+                <!-- Dynamically populated -->
+            </div>
+            <div class="motivation-message" id="motivation-message">
+                <div class="motivation-emoji">💪</div>
+                <div class="motivation-text">今日も頑張りましょう!</div>
+                <div class="motivation-subtext">毎日の積み重ねが合格への近道です</div>
+            </div>
         </div>
 
         <!-- Dashboard Section -->
@@ -1017,6 +1590,426 @@
             btn.title = isDark ? 'ライトモード' : 'ダークモード';
         }
 
+        // =====================
+        // 学習リマインダー機能
+        // =====================
+
+        // 全セッションを取得
+        function getAllSessions() {
+            const currentUser = UserManager.getCurrentUser();
+            if (!currentUser) return [];
+
+            const userPrefix = 'quiz_user_' + currentUser + '_';
+            const allSessions = [];
+
+            QUALIFICATIONS.forEach(qual => {
+                qual.statsKeys.forEach(key => {
+                    const data = localStorage.getItem(userPrefix + key);
+                    if (data) {
+                        try {
+                            const stats = JSON.parse(data);
+                            if (stats.sessions) {
+                                allSessions.push(...stats.sessions);
+                            }
+                        } catch (e) {
+                            console.error('Error parsing stats:', key, e);
+                        }
+                    }
+                });
+            });
+
+            return allSessions;
+        }
+
+        // 最後の学習日からの経過日数を計算
+        function getDaysSinceLastStudy(sessions) {
+            if (sessions.length === 0) return null;
+
+            let lastDate = null;
+            sessions.forEach(session => {
+                const sessionDate = new Date(session.date);
+                if (!lastDate || sessionDate > lastDate) {
+                    lastDate = sessionDate;
+                }
+            });
+
+            if (!lastDate) return null;
+
+            const now = new Date();
+            const diffTime = now - lastDate;
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays;
+        }
+
+        // 今日の学習問題数を計算
+        function getTodayQuestions(sessions) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            let todayTotal = 0;
+            sessions.forEach(session => {
+                const sessionDate = new Date(session.date);
+                sessionDate.setHours(0, 0, 0, 0);
+                if (sessionDate.getTime() === today.getTime()) {
+                    todayTotal += session.total || 0;
+                }
+            });
+
+            return todayTotal;
+        }
+
+        // リマインダーメッセージを取得
+        function getReminderMessage(daysSince) {
+            if (daysSince === null) {
+                return '学習を始めましょう!';
+            } else if (daysSince === 0) {
+                return '今日も学習していますね! 素晴らしい!';
+            } else if (daysSince === 1) {
+                return '昨日学習しました。今日も続けましょう!';
+            } else if (daysSince <= 3) {
+                return 'そろそろ学習しましょう! 記憶が薄れる前に復習を!';
+            } else if (daysSince <= 7) {
+                return '1週間近く空いています。今日から再開しましょう!';
+            } else {
+                return '学習を再開しましょう! 合格への道は継続から!';
+            }
+        }
+
+        // 日別の学習データをマップ化
+        function getStudyDataByDate(sessions) {
+            const dateMap = {};
+
+            sessions.forEach(session => {
+                const date = new Date(session.date);
+                const dateKey = date.toISOString().split('T')[0];
+
+                if (!dateMap[dateKey]) {
+                    dateMap[dateKey] = 0;
+                }
+                dateMap[dateKey] += session.total || 0;
+            });
+
+            return dateMap;
+        }
+
+        // 目標設定を保存/読み込み
+        function getDailyGoal() {
+            const currentUser = UserManager.getCurrentUser();
+            if (!currentUser) return 20;
+            return parseInt(localStorage.getItem('quiz_user_' + currentUser + '_daily_goal') || '20');
+        }
+
+        function setDailyGoal(goal) {
+            const currentUser = UserManager.getCurrentUser();
+            if (!currentUser) return;
+            localStorage.setItem('quiz_user_' + currentUser + '_daily_goal', goal);
+        }
+
+        // リマインダーを更新
+        function updateReminder() {
+            const sessions = getAllSessions();
+            const daysSince = getDaysSinceLastStudy(sessions);
+            const todayQuestions = getTodayQuestions(sessions);
+            const dailyGoal = getDailyGoal();
+
+            // 経過日数を表示
+            const daysSinceEl = document.getElementById('days-since-last');
+            if (daysSince === null) {
+                daysSinceEl.textContent = '--';
+                daysSinceEl.className = 'days-since-last';
+            } else if (daysSince === 0) {
+                daysSinceEl.textContent = '今日';
+                daysSinceEl.className = 'days-since-last good';
+            } else {
+                daysSinceEl.textContent = daysSince + '日';
+                if (daysSince <= 1) {
+                    daysSinceEl.className = 'days-since-last good';
+                } else if (daysSince <= 3) {
+                    daysSinceEl.className = 'days-since-last warning';
+                } else {
+                    daysSinceEl.className = 'days-since-last danger';
+                }
+            }
+
+            // リマインダーメッセージを表示
+            document.getElementById('reminder-message').textContent = getReminderMessage(daysSince);
+
+            // 今日の学習問題数を表示
+            document.getElementById('today-progress').textContent = todayQuestions;
+
+            // 目標設定を更新
+            const goalSelect = document.getElementById('daily-goal-select');
+            goalSelect.value = dailyGoal;
+
+            // 目標進捗を更新
+            const progressPercent = Math.min((todayQuestions / dailyGoal) * 100, 100);
+            document.getElementById('daily-goal-fill').style.width = progressPercent + '%';
+            document.getElementById('daily-goal-current').textContent = todayQuestions + '問達成';
+
+            const remaining = Math.max(dailyGoal - todayQuestions, 0);
+            if (remaining === 0) {
+                document.getElementById('daily-goal-remaining').textContent = '目標達成!';
+            } else {
+                document.getElementById('daily-goal-remaining').textContent = '目標まであと' + remaining + '問';
+            }
+        }
+
+        function updateDailyGoal() {
+            const goalSelect = document.getElementById('daily-goal-select');
+            setDailyGoal(goalSelect.value);
+            updateReminder();
+        }
+
+        // =====================
+        // 学習カレンダー機能
+        // =====================
+
+        function generateCalendar() {
+            const sessions = getAllSessions();
+            const studyData = getStudyDataByDate(sessions);
+            const streakDays = calculateStreakDays(sessions);
+
+            // 連続学習日数を表示
+            document.getElementById('calendar-streak').textContent = streakDays + '日連続';
+
+            const weeksContainer = document.getElementById('calendar-weeks');
+            weeksContainer.innerHTML = '';
+
+            // 過去12週間分のカレンダーを生成
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // 12週間前の日曜日を取得
+            const startDate = new Date(today);
+            startDate.setDate(today.getDate() - (12 * 7) - today.getDay());
+
+            let currentDate = new Date(startDate);
+
+            // 各週のデータを生成
+            for (let week = 0; week < 13; week++) {
+                const weekEl = document.createElement('div');
+                weekEl.className = 'calendar-week';
+
+                for (let day = 0; day < 7; day++) {
+                    const dayEl = document.createElement('div');
+                    dayEl.className = 'calendar-day';
+
+                    if (currentDate <= today) {
+                        const dateKey = currentDate.toISOString().split('T')[0];
+                        const questions = studyData[dateKey] || 0;
+
+                        // 学習量に応じたレベルを設定
+                        let level = 0;
+                        if (questions > 0) {
+                            if (questions >= 50) level = 4;
+                            else if (questions >= 30) level = 3;
+                            else if (questions >= 15) level = 2;
+                            else level = 1;
+                        }
+
+                        dayEl.classList.add('level-' + level);
+                        dayEl.dataset.date = dateKey;
+                        dayEl.dataset.questions = questions;
+
+                        // ツールチップイベント
+                        dayEl.addEventListener('mouseenter', showCalendarTooltip);
+                        dayEl.addEventListener('mouseleave', hideCalendarTooltip);
+                    } else {
+                        dayEl.style.visibility = 'hidden';
+                    }
+
+                    weekEl.appendChild(dayEl);
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+
+                weeksContainer.appendChild(weekEl);
+            }
+        }
+
+        function showCalendarTooltip(e) {
+            const tooltip = document.getElementById('calendar-tooltip');
+            const date = e.target.dataset.date;
+            const questions = e.target.dataset.questions;
+
+            const dateObj = new Date(date);
+            const dateStr = (dateObj.getMonth() + 1) + '/' + dateObj.getDate();
+
+            tooltip.innerHTML = '<strong>' + dateStr + '</strong><br>' + questions + '問学習';
+            tooltip.style.display = 'block';
+            tooltip.style.left = (e.pageX + 10) + 'px';
+            tooltip.style.top = (e.pageY - 30) + 'px';
+        }
+
+        function hideCalendarTooltip() {
+            document.getElementById('calendar-tooltip').style.display = 'none';
+        }
+
+        // =====================
+        // 達成バッジ機能
+        // =====================
+
+        const BADGES = [
+            {
+                id: 'first_step',
+                name: '最初の一歩',
+                emoji: '👣',
+                description: '初めての学習',
+                check: (data) => data.totalQuestions >= 1,
+                progress: (data) => Math.min(data.totalQuestions, 1) + '/1'
+            },
+            {
+                id: 'questions_50',
+                name: '50問達成',
+                emoji: '📚',
+                description: '累計50問を学習',
+                check: (data) => data.totalQuestions >= 50,
+                progress: (data) => Math.min(data.totalQuestions, 50) + '/50'
+            },
+            {
+                id: 'questions_100',
+                name: '100問達成',
+                emoji: '🎯',
+                description: '累計100問を学習',
+                check: (data) => data.totalQuestions >= 100,
+                progress: (data) => Math.min(data.totalQuestions, 100) + '/100'
+            },
+            {
+                id: 'questions_500',
+                name: '500問達成',
+                emoji: '🏅',
+                description: '累計500問を学習',
+                check: (data) => data.totalQuestions >= 500,
+                progress: (data) => Math.min(data.totalQuestions, 500) + '/500'
+            },
+            {
+                id: 'questions_1000',
+                name: '1000問達成',
+                emoji: '🏆',
+                description: '累計1000問を学習',
+                check: (data) => data.totalQuestions >= 1000,
+                progress: (data) => Math.min(data.totalQuestions, 1000) + '/1000'
+            },
+            {
+                id: 'streak_3',
+                name: '3日連続',
+                emoji: '🔥',
+                description: '3日連続で学習',
+                check: (data) => data.streakDays >= 3,
+                progress: (data) => Math.min(data.streakDays, 3) + '/3日'
+            },
+            {
+                id: 'streak_7',
+                name: '1週間連続',
+                emoji: '💪',
+                description: '7日連続で学習',
+                check: (data) => data.streakDays >= 7,
+                progress: (data) => Math.min(data.streakDays, 7) + '/7日'
+            },
+            {
+                id: 'streak_14',
+                name: '2週間連続',
+                emoji: '⭐',
+                description: '14日連続で学習',
+                check: (data) => data.streakDays >= 14,
+                progress: (data) => Math.min(data.streakDays, 14) + '/14日'
+            },
+            {
+                id: 'streak_30',
+                name: '1ヶ月連続',
+                emoji: '👑',
+                description: '30日連続で学習',
+                check: (data) => data.streakDays >= 30,
+                progress: (data) => Math.min(data.streakDays, 30) + '/30日'
+            },
+            {
+                id: 'accuracy_70',
+                name: '正答率70%',
+                emoji: '📈',
+                description: '全体正答率70%以上',
+                check: (data) => data.totalAccuracy >= 70,
+                progress: (data) => (data.totalAccuracy || 0) + '%/70%'
+            },
+            {
+                id: 'accuracy_80',
+                name: '正答率80%',
+                emoji: '🌟',
+                description: '全体正答率80%以上',
+                check: (data) => data.totalAccuracy >= 80,
+                progress: (data) => (data.totalAccuracy || 0) + '%/80%'
+            },
+            {
+                id: 'accuracy_90',
+                name: '正答率90%',
+                emoji: '💎',
+                description: '全体正答率90%以上',
+                check: (data) => data.totalAccuracy >= 90,
+                progress: (data) => (data.totalAccuracy || 0) + '%/90%'
+            }
+        ];
+
+        const MOTIVATION_MESSAGES = [
+            { emoji: '💪', text: '今日も頑張りましょう!', subtext: '毎日の積み重ねが合格への近道です' },
+            { emoji: '🚀', text: '目標に向かって前進中!', subtext: 'この調子で続けましょう' },
+            { emoji: '🌟', text: 'あなたならできる!', subtext: '自分を信じて学習を続けましょう' },
+            { emoji: '📖', text: '知識は力なり!', subtext: '学んだことは必ず活きてきます' },
+            { emoji: '🎯', text: '合格まであと少し!', subtext: '最後まで諦めずに頑張りましょう' },
+            { emoji: '⏰', text: 'コツコツが大事!', subtext: '少しずつでも毎日続けることが大切です' },
+            { emoji: '🔥', text: '燃えろ学習魂!', subtext: '熱い気持ちで資格を勝ち取りましょう' },
+            { emoji: '🌈', text: '努力は必ず報われる!', subtext: '今日の学習が未来の自分を作ります' }
+        ];
+
+        function updateAchievements() {
+            const data = getDashboardData();
+            if (!data) {
+                document.getElementById('badges-grid').innerHTML = '<p class="no-data-message">ユーザーを選択してください</p>';
+                return;
+            }
+
+            const badgesGrid = document.getElementById('badges-grid');
+            badgesGrid.innerHTML = BADGES.map(badge => {
+                const isUnlocked = badge.check(data);
+                const progress = badge.progress(data);
+
+                return `
+                    <div class="badge-card ${isUnlocked ? 'unlocked' : 'locked'}">
+                        ${isUnlocked ? '<div class="badge-checkmark">✓</div>' : ''}
+                        <span class="badge-emoji">${badge.emoji}</span>
+                        <div class="badge-name">${badge.name}</div>
+                        <div class="badge-description">${badge.description}</div>
+                        ${!isUnlocked ? '<div class="badge-progress">' + progress + '</div>' : ''}
+                    </div>
+                `;
+            }).join('');
+
+            // モチベーションメッセージを更新
+            updateMotivationMessage(data);
+        }
+
+        function updateMotivationMessage(data) {
+            const messageEl = document.getElementById('motivation-message');
+            let message;
+
+            // 状況に応じたメッセージを選択
+            if (data.streakDays >= 7) {
+                message = { emoji: '🔥', text: data.streakDays + '日連続学習中! 素晴らしい!', subtext: 'この調子で記録を伸ばしましょう!' };
+            } else if (data.totalAccuracy >= 80) {
+                message = { emoji: '🌟', text: '正答率' + data.totalAccuracy + '%! 好調です!', subtext: 'この調子で合格を目指しましょう!' };
+            } else if (data.totalQuestions >= 500) {
+                message = { emoji: '🏅', text: data.totalQuestions + '問達成! 頑張っていますね!', subtext: '着実に力がついています!' };
+            } else if (data.totalQuestions === 0) {
+                message = { emoji: '📚', text: 'さあ、学習を始めましょう!', subtext: '最初の一歩が合格への第一歩です' };
+            } else {
+                // ランダムにメッセージを選択
+                message = MOTIVATION_MESSAGES[Math.floor(Math.random() * MOTIVATION_MESSAGES.length)];
+            }
+
+            messageEl.innerHTML = `
+                <div class="motivation-emoji">${message.emoji}</div>
+                <div class="motivation-text">${message.text}</div>
+                <div class="motivation-subtext">${message.subtext}</div>
+            `;
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize dark mode
             const darkMode = localStorage.getItem('quiz_dark_mode') === 'true';
@@ -1030,6 +2023,10 @@
                 console.log('User ready:', userName);
                 // ダッシュボードを更新
                 updateDashboard();
+                // 学習継続機能を更新
+                updateReminder();
+                generateCalendar();
+                updateAchievements();
             });
         });
     </script>
