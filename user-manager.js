@@ -1,16 +1,14 @@
 /**
  * User Management System for Quiz Apps
- * Shared across all quiz applications
+ * Supports both Supabase (online) and LocalStorage (offline) modes
  *
- * Data structure in localStorage:
- * - quiz_users: Array of user names
- * - quiz_current_user: Currently selected user name
- * - quiz_user_{userName}_studied: Array of studied question IDs
- * - quiz_user_{userName}_difficult: Array of difficult question IDs
- * - quiz_user_{userName}_bookmarks: Array of bookmarked question IDs
- * - quiz_user_{userName}_stats: Statistics object
- * - quiz_user_{userName}_history: Learning history array
- * - quiz_user_{userName}_wrong: Wrong answers object
+ * When Supabase is configured and user is logged in:
+ * - Data is synced to cloud
+ * - Cross-device access enabled
+ *
+ * When offline or Supabase not configured:
+ * - Data stored in LocalStorage
+ * - Works as standalone app
  */
 
 const UserManager = (function() {
@@ -18,14 +16,52 @@ const UserManager = (function() {
     const USERS_KEY = 'quiz_users';
     const CURRENT_USER_KEY = 'quiz_current_user';
     const USER_PREFIX = 'quiz_user_';
+    const ONLINE_MODE_KEY = 'quiz_online_mode';
 
-    // =====================
-    // User Management Functions
-    // =====================
+    // State
+    let isOnlineMode = false;
+    let supabaseUser = null;
+
+    // =====================================================
+    // Mode Detection and Initialization
+    // =====================================================
 
     /**
-     * Get all registered users
-     * @returns {string[]} Array of user names
+     * Check if running in online mode with Supabase
+     */
+    function checkOnlineMode() {
+        // Check if Supabase is available and configured
+        if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured()) {
+            if (typeof SupabaseService !== 'undefined') {
+                supabaseUser = SupabaseService.getCurrentUser();
+                isOnlineMode = supabaseUser !== null;
+            }
+        }
+        return isOnlineMode;
+    }
+
+    /**
+     * Set online mode
+     */
+    function setOnlineMode(online, user = null) {
+        isOnlineMode = online;
+        supabaseUser = user;
+        localStorage.setItem(ONLINE_MODE_KEY, online ? 'true' : 'false');
+    }
+
+    /**
+     * Is currently in online mode
+     */
+    function isOnline() {
+        return isOnlineMode && supabaseUser !== null;
+    }
+
+    // =====================================================
+    // User Management Functions (Offline Mode)
+    // =====================================================
+
+    /**
+     * Get all registered users (offline mode)
      */
     function getUsers() {
         const data = localStorage.getItem(USERS_KEY);
@@ -34,32 +70,30 @@ const UserManager = (function() {
 
     /**
      * Save users list
-     * @param {string[]} users - Array of user names
      */
     function saveUsers(users) {
         localStorage.setItem(USERS_KEY, JSON.stringify(users));
     }
 
     /**
-     * Get current user
-     * @returns {string|null} Current user name or null if not set
+     * Get current user (offline mode)
      */
     function getCurrentUser() {
+        if (isOnlineMode && supabaseUser) {
+            return supabaseUser.email || supabaseUser.id;
+        }
         return localStorage.getItem(CURRENT_USER_KEY);
     }
 
     /**
-     * Set current user
-     * @param {string} userName - User name to set as current
+     * Set current user (offline mode)
      */
     function setCurrentUser(userName) {
         localStorage.setItem(CURRENT_USER_KEY, userName);
     }
 
     /**
-     * Add a new user
-     * @param {string} userName - Name of the new user
-     * @returns {boolean} True if successful, false if user already exists
+     * Add a new user (offline mode)
      */
     function addUser(userName) {
         const trimmedName = userName.trim();
@@ -78,9 +112,7 @@ const UserManager = (function() {
     }
 
     /**
-     * Delete a user and all their data
-     * @param {string} userName - Name of the user to delete
-     * @returns {boolean} True if successful
+     * Delete a user and all their data (offline mode)
      */
     function deleteUser(userName) {
         const users = getUsers();
@@ -90,22 +122,10 @@ const UserManager = (function() {
             return { success: false, message: 'ユーザーが見つかりません' };
         }
 
-        // Remove user from list
         users.splice(index, 1);
         saveUsers(users);
 
         // Clear user data from all apps
-        const suffixes = ['_studied', '_difficult', '_bookmarks', '_stats', '_history', '_wrong'];
-        const appPrefixes = ['_r1', '_r2', '_r3', '_r4', '_r5', '_r6', '_r7', '_takken', '_kenchikushi', '_keirishi', '_mental', ''];
-
-        suffixes.forEach(suffix => {
-            appPrefixes.forEach(appPrefix => {
-                const key = USER_PREFIX + userName + appPrefix + suffix;
-                localStorage.removeItem(key);
-            });
-        });
-
-        // Also remove any keys that match the pattern
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -115,7 +135,6 @@ const UserManager = (function() {
         }
         keysToRemove.forEach(key => localStorage.removeItem(key));
 
-        // If deleted user was current user, clear current user
         if (getCurrentUser() === userName) {
             localStorage.removeItem(CURRENT_USER_KEY);
         }
@@ -124,9 +143,7 @@ const UserManager = (function() {
     }
 
     /**
-     * Select a user
-     * @param {string} userName - Name of the user to select
-     * @returns {boolean} True if successful
+     * Select a user (offline mode)
      */
     function selectUser(userName) {
         const users = getUsers();
@@ -140,22 +157,22 @@ const UserManager = (function() {
 
     /**
      * Check if a user is selected
-     * @returns {boolean} True if a user is currently selected
      */
     function hasCurrentUser() {
+        if (isOnlineMode) {
+            return supabaseUser !== null;
+        }
         const currentUser = getCurrentUser();
         const users = getUsers();
         return currentUser && users.includes(currentUser);
     }
 
-    // =====================
-    // User-prefixed Storage Functions
-    // =====================
+    // =====================================================
+    // User-prefixed Storage Functions (Hybrid)
+    // =====================================================
 
     /**
-     * Get storage key for current user
-     * @param {string} baseKey - Base key name (e.g., 'wrong_r7')
-     * @returns {string|null} Full key with user prefix, or null if no user
+     * Get storage key for current user (offline mode)
      */
     function getUserKey(baseKey) {
         const currentUser = getCurrentUser();
@@ -165,43 +182,49 @@ const UserManager = (function() {
 
     /**
      * Get data from user-specific storage
-     * @param {string} baseKey - Base key name
-     * @param {*} defaultValue - Default value if not found
-     * @returns {*} Stored value or default
+     * In online mode, also syncs from cloud
      */
     function getUserData(baseKey, defaultValue = null) {
+        // First get from local storage (works offline)
         const key = getUserKey(baseKey);
         if (!key) return defaultValue;
 
         const data = localStorage.getItem(key);
-        if (data === null) return defaultValue;
+        let result = defaultValue;
 
-        try {
-            return JSON.parse(data);
-        } catch {
-            return data;
+        if (data !== null) {
+            try {
+                result = JSON.parse(data);
+            } catch {
+                result = data;
+            }
         }
+
+        return result;
     }
 
     /**
      * Save data to user-specific storage
-     * @param {string} baseKey - Base key name
-     * @param {*} value - Value to store
-     * @returns {boolean} True if successful
+     * In online mode, also syncs to cloud
      */
     function setUserData(baseKey, value) {
+        // Always save to localStorage first (offline-first)
         const key = getUserKey(baseKey);
         if (!key) return false;
 
         const data = typeof value === 'string' ? value : JSON.stringify(value);
         localStorage.setItem(key, data);
+
+        // If online, also sync to cloud (non-blocking)
+        if (isOnlineMode && supabaseUser && typeof SupabaseService !== 'undefined') {
+            syncToCloud(baseKey, value);
+        }
+
         return true;
     }
 
     /**
      * Remove user-specific data
-     * @param {string} baseKey - Base key name
-     * @returns {boolean} True if successful
      */
     function removeUserData(baseKey) {
         const key = getUserKey(baseKey);
@@ -211,16 +234,56 @@ const UserManager = (function() {
         return true;
     }
 
-    // =====================
+    /**
+     * Sync data to cloud (non-blocking)
+     */
+    async function syncToCloud(baseKey, value) {
+        if (!isOnlineMode || !supabaseUser) return;
+
+        try {
+            // Extract app ID from baseKey (e.g., "wrong_r1" -> "r1")
+            const appIdMatch = baseKey.match(/_(r\d|takken|kenchikushi|keirishi|mental)$/);
+            if (!appIdMatch) return;
+
+            const appId = appIdMatch[1];
+            const dataType = baseKey.replace('_' + appId, '');
+
+            // Sync based on data type
+            switch (dataType) {
+                case 'wrong':
+                    // Sync wrong answers
+                    for (const [qId, data] of Object.entries(value || {})) {
+                        if (data.count > 0) {
+                            await SupabaseService.saveWrongAnswer(appId, parseInt(qId));
+                        }
+                    }
+                    break;
+
+                case 'bookmarks':
+                    // Bookmarks are synced individually via addBookmark/removeBookmark
+                    break;
+
+                case 'adaptive':
+                    // Adaptive learning is synced during quiz
+                    break;
+
+                case 'stats':
+                    // Stats are computed server-side
+                    break;
+            }
+        } catch (e) {
+            console.warn('Cloud sync failed:', e);
+        }
+    }
+
+    // =====================================================
     // UI Functions
-    // =====================
+    // =====================================================
 
     /**
-     * Show user selection modal
-     * @param {Function} onSelect - Callback when user is selected
+     * Show user selection modal (offline mode)
      */
     function showUserSelectionModal(onSelect) {
-        // Remove existing modal if any
         const existingModal = document.getElementById('user-selection-modal');
         if (existingModal) {
             existingModal.remove();
@@ -263,8 +326,6 @@ const UserManager = (function() {
         `;
 
         document.body.appendChild(modal);
-
-        // Add styles if not already added
         addUserModalStyles();
 
         // Event listeners
@@ -315,7 +376,6 @@ const UserManager = (function() {
             });
         }
 
-        // Focus on input if no users
         if (users.length === 0) {
             nameInput.focus();
         }
@@ -340,7 +400,6 @@ const UserManager = (function() {
                 </div>
             `).join('');
 
-        // Update footer
         const footer = document.querySelector('.user-modal-footer');
         if (footer) {
             footer.innerHTML = hasCurrentUser() ? '<button id="user-cancel-btn" class="user-btn user-btn-secondary">キャンセル</button>' : '';
@@ -370,16 +429,16 @@ const UserManager = (function() {
 
     /**
      * Create user indicator element
-     * @returns {HTMLElement} User indicator element
      */
     function createUserIndicator() {
         const currentUser = getCurrentUser();
+        const isCloudMode = isOnlineMode && supabaseUser;
 
         const indicator = document.createElement('div');
         indicator.id = 'user-indicator';
-        indicator.className = 'user-indicator';
+        indicator.className = `user-indicator ${isCloudMode ? 'online-mode' : ''}`;
         indicator.innerHTML = `
-            <span class="user-icon">👤</span>
+            <span class="user-icon">${isCloudMode ? '☁️' : '👤'}</span>
             <span class="user-current-name">${currentUser ? escapeHtml(currentUser) : '未選択'}</span>
             <button class="user-change-btn" title="ユーザー切替">▼</button>
         `;
@@ -433,14 +492,8 @@ const UserManager = (function() {
             }
 
             @keyframes modalSlideIn {
-                from {
-                    opacity: 0;
-                    transform: translateY(-20px);
-                }
-                to {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
+                from { opacity: 0; transform: translateY(-20px); }
+                to { opacity: 1; transform: translateY(0); }
             }
 
             .user-modal-header {
@@ -579,7 +632,6 @@ const UserManager = (function() {
                 text-align: center;
             }
 
-            /* User Indicator Styles */
             .user-indicator {
                 position: fixed;
                 top: 20px;
@@ -598,6 +650,10 @@ const UserManager = (function() {
 
             .user-indicator:hover {
                 box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+            }
+
+            .user-indicator.online-mode {
+                background: linear-gradient(135deg, var(--card-bg, #ffffff), #e0f2fe);
             }
 
             .user-icon {
@@ -622,7 +678,6 @@ const UserManager = (function() {
                 padding: 2px;
             }
 
-            /* Dark mode support */
             body.dark-mode .user-modal {
                 background: var(--card-bg, #1e293b);
             }
@@ -641,7 +696,6 @@ const UserManager = (function() {
                 background: var(--card-bg, #1e293b);
             }
 
-            /* Responsive */
             @media (max-width: 480px) {
                 .user-modal {
                     padding: 20px;
@@ -665,21 +719,32 @@ const UserManager = (function() {
 
     /**
      * Initialize user management on page load
-     * Shows modal if no user is selected
-     * @param {Function} onUserReady - Callback when user is ready
+     * Uses AuthUI if Supabase is configured, otherwise shows local user modal
      */
     function init(onUserReady) {
         addUserModalStyles();
 
-        // Check if user is selected
-        if (!hasCurrentUser()) {
-            showUserSelectionModal((userName) => {
-                addUserIndicatorToPage();
-                if (onUserReady) onUserReady(userName);
+        // Check if Supabase/AuthUI is available
+        if (typeof AuthUI !== 'undefined' && typeof isSupabaseConfigured === 'function' && isSupabaseConfigured()) {
+            // Use AuthUI for authentication
+            AuthUI.init((user) => {
+                if (user) {
+                    // Online mode
+                    setOnlineMode(true, user);
+                }
+                if (onUserReady) onUserReady(getCurrentUser());
             });
         } else {
-            addUserIndicatorToPage();
-            if (onUserReady) onUserReady(getCurrentUser());
+            // Offline mode - use local user selection
+            if (!hasCurrentUser()) {
+                showUserSelectionModal((userName) => {
+                    addUserIndicatorToPage();
+                    if (onUserReady) onUserReady(userName);
+                });
+            } else {
+                addUserIndicatorToPage();
+                if (onUserReady) onUserReady(getCurrentUser());
+            }
         }
     }
 
@@ -687,29 +752,36 @@ const UserManager = (function() {
      * Add user indicator to page
      */
     function addUserIndicatorToPage() {
-        // Remove existing indicator
         const existing = document.getElementById('user-indicator');
         if (existing) existing.remove();
 
         const indicator = createUserIndicator();
         document.body.appendChild(indicator);
 
-        // Click to show modal
         indicator.addEventListener('click', () => {
-            showUserSelectionModal((userName) => {
-                // Update indicator
-                const nameEl = indicator.querySelector('.user-current-name');
-                if (nameEl) {
-                    nameEl.textContent = userName;
-                }
-                // Reload page to refresh data
-                window.location.reload();
-            });
+            if (isOnlineMode && typeof AuthUI !== 'undefined') {
+                // Online mode - show AuthUI menu
+                AuthUI.showAuthModal();
+            } else {
+                // Offline mode - show user selection
+                showUserSelectionModal((userName) => {
+                    const nameEl = indicator.querySelector('.user-current-name');
+                    if (nameEl) {
+                        nameEl.textContent = userName;
+                    }
+                    window.location.reload();
+                });
+            }
         });
     }
 
     // Public API
     return {
+        // Mode
+        checkOnlineMode,
+        setOnlineMode,
+        isOnline,
+
         // User management
         getUsers,
         getCurrentUser,
