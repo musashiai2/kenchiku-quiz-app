@@ -494,7 +494,9 @@ body {
 }
 
 .question-number {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     background: var(--primary-color);
     color: white;
     padding: 6px 16px;
@@ -502,6 +504,26 @@ body {
     font-size: 0.9rem;
     font-weight: 600;
     margin-bottom: 16px;
+}
+
+/* 問題タイプバッジ（四肢択一/五肢択一） */
+.question-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+.question-type-badge.four-choice {
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+.question-type-badge.five-choice {
+    background: #fbbf24;
+    color: #1e293b;
 }
 
 .question-text {
@@ -517,6 +539,21 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
+}
+
+/* 5択用のレイアウト */
+.choices.five-choices {
+    gap: 10px;
+}
+
+.choices.five-choices .choice-btn {
+    padding: 12px;
+}
+
+.choices.five-choices .choice-number {
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
 }
 
 .choice-btn {

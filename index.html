@@ -72,6 +72,49 @@
             transform: scale(1.1);
         }
 
+        /* User indicator adjustment for main page */
+        .user-indicator {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: var(--card-bg);
+            border-radius: 30px;
+            box-shadow: var(--shadow);
+            z-index: 999;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .user-indicator:hover {
+            box-shadow: var(--shadow-lg);
+        }
+
+        .user-icon {
+            font-size: 1.1rem;
+        }
+
+        .user-current-name {
+            font-weight: 500;
+            color: var(--text-color);
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .user-change-btn {
+            background: none;
+            border: none;
+            color: var(--text-light);
+            font-size: 0.7rem;
+            cursor: pointer;
+            padding: 2px;
+        }
+
         .header {
             text-align: center;
             padding: 40px 20px;
@@ -419,6 +462,7 @@
         </div>
     </div>
 
+    <script src="user-manager.js"></script>
     <script>
         function toggleDarkMode() {
             document.body.classList.toggle('dark-mode');
@@ -435,11 +479,17 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Initialize dark mode
             const darkMode = localStorage.getItem('quiz_dark_mode') === 'true';
             if (darkMode) {
                 document.body.classList.add('dark-mode');
                 updateDarkModeButton();
             }
+
+            // Initialize user management
+            UserManager.init((userName) => {
+                console.log('User ready:', userName);
+            });
         });
     </script>
 </body>

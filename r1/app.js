@@ -1,4 +1,4 @@
-// アプリケーション状態
+﻿// アプリケーション状態
 let currentQuiz = [];
 let currentIndex = 0;
 let correctCount = 0;
@@ -8,25 +8,31 @@ let timerInterval = null;
 let timeRemaining = 0;
 let isTimerMode = false;
 
-// LocalStorage キー
-const STORAGE_KEYS = {
-    wrongAnswers: 'quiz_wrong_answers',
-    stats: 'quiz_stats',
-    bookmarks: 'quiz_bookmarks',
-    darkMode: 'quiz_dark_mode',
-    history: 'quiz_history'
+// LocalStorage キー基底 (令和1年度用) - ユーザープレフィックスは UserManager が付与
+const STORAGE_BASE_KEYS = {
+    wrongAnswers: 'wrong_r1',
+    stats: 'stats_r1',
+    bookmarks: 'bookmarks_r1',
+    history: 'history_r1'
 };
+
+// ダークモードは共通設定
+const DARK_MODE_KEY = 'quiz_dark_mode';
 
 // 初期化
 document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
-    showScreen('start-screen');
+    // ユーザー管理の初期化
+    UserManager.init((userName) => {
+        console.log('User ready:', userName);
+        initializeApp();
+        showScreen('start-screen');
+    });
 });
 
 // アプリ初期化
 function initializeApp() {
     // ダークモード復元
-    const darkMode = localStorage.getItem(STORAGE_KEYS.darkMode) === 'true';
+    const darkMode = localStorage.getItem(DARK_MODE_KEY) === 'true';
     if (darkMode) {
         document.body.classList.add('dark-mode');
         updateDarkModeButton();
@@ -44,8 +50,7 @@ function initializeApp() {
 
 // 間違えた問題を取得
 function getWrongAnswers() {
-    const data = localStorage.getItem(STORAGE_KEYS.wrongAnswers);
-    return data ? JSON.parse(data) : {};
+    return UserManager.getUserData(STORAGE_BASE_KEYS.wrongAnswers, {});
 }
 
 // 間違えた問題を保存
@@ -56,7 +61,7 @@ function saveWrongAnswer(questionId) {
     }
     wrongAnswers[questionId].count++;
     wrongAnswers[questionId].lastWrong = new Date().toISOString();
-    localStorage.setItem(STORAGE_KEYS.wrongAnswers, JSON.stringify(wrongAnswers));
+    UserManager.setUserData(STORAGE_BASE_KEYS.wrongAnswers, wrongAnswers);
 }
 
 // 正解した問題を記録（間違い回数を減らす）
@@ -68,14 +73,13 @@ function recordCorrectAnswer(questionId) {
         if (wrongAnswers[questionId].count <= 0) {
             delete wrongAnswers[questionId];
         }
-        localStorage.setItem(STORAGE_KEYS.wrongAnswers, JSON.stringify(wrongAnswers));
+        UserManager.setUserData(STORAGE_BASE_KEYS.wrongAnswers, wrongAnswers);
     }
 }
 
 // ブックマークを取得
 function getBookmarks() {
-    const data = localStorage.getItem(STORAGE_KEYS.bookmarks);
-    return data ? JSON.parse(data) : [];
+    return UserManager.getUserData(STORAGE_BASE_KEYS.bookmarks, []);
 }
 
 // ブックマークを保存
@@ -87,20 +91,19 @@ function toggleBookmark(questionId) {
     } else {
         bookmarks.push(questionId);
     }
-    localStorage.setItem(STORAGE_KEYS.bookmarks, JSON.stringify(bookmarks));
+    UserManager.setUserData(STORAGE_BASE_KEYS.bookmarks, bookmarks);
     updateBookmarkButton(questionId);
     updateBookmarkCountDisplay();
 }
 
 // 統計データを取得
 function getStats() {
-    const data = localStorage.getItem(STORAGE_KEYS.stats);
-    return data ? JSON.parse(data) : {
+    return UserManager.getUserData(STORAGE_BASE_KEYS.stats, {
         totalAttempts: 0,
         totalQuestions: 0,
         totalCorrect: 0,
         sessions: []
-    };
+    });
 }
 
 // 統計データを保存
@@ -120,12 +123,12 @@ function saveStats(correct, total, mode) {
     if (stats.sessions.length > 50) {
         stats.sessions = stats.sessions.slice(-50);
     }
-    localStorage.setItem(STORAGE_KEYS.stats, JSON.stringify(stats));
+    UserManager.setUserData(STORAGE_BASE_KEYS.stats, stats);
 }
 
 // 履歴を保存
 function saveHistory(answers) {
-    const history = JSON.parse(localStorage.getItem(STORAGE_KEYS.history) || '[]');
+    const history = UserManager.getUserData(STORAGE_BASE_KEYS.history, []);
     history.push({
         date: new Date().toISOString(),
         mode: quizMode,
@@ -139,7 +142,7 @@ function saveHistory(answers) {
     if (history.length > 20) {
         history.shift();
     }
-    localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(history));
+    UserManager.setUserData(STORAGE_BASE_KEYS.history, history);
 }
 
 // =====================
@@ -237,21 +240,21 @@ function startQuiz(mode, withTimer = false) {
     // モードに応じて問題を選択
     switch (mode) {
         case 'all':
-            currentQuiz = [...questions];
+            currentQuiz = [...quizData];
             break;
         case 'am':
-            currentQuiz = questions.filter(q => q.id <= 50);
+            currentQuiz = quizData.filter(q => q.id <= 44);
             break;
         case 'pm':
-            currentQuiz = questions.filter(q => q.id > 50);
+            currentQuiz = quizData.filter(q => q.id > 44);
             break;
         case 'random':
-            currentQuiz = shuffleArray([...questions]).slice(0, 20);
+            currentQuiz = shuffleArray([...quizData]).slice(0, 20);
             break;
         case 'wrong':
             const wrongAnswers = getWrongAnswers();
             const wrongIds = Object.keys(wrongAnswers).map(id => parseInt(id));
-            currentQuiz = questions.filter(q => wrongIds.includes(q.id));
+            currentQuiz = quizData.filter(q => wrongIds.includes(q.id));
             // 間違い回数が多い順にソート
             currentQuiz.sort((a, b) => {
                 return (wrongAnswers[b.id]?.count || 0) - (wrongAnswers[a.id]?.count || 0);
@@ -259,7 +262,7 @@ function startQuiz(mode, withTimer = false) {
             break;
         case 'bookmark':
             const bookmarks = getBookmarks();
-            currentQuiz = questions.filter(q => bookmarks.includes(q.id));
+            currentQuiz = quizData.filter(q => bookmarks.includes(q.id));
             break;
     }
 
@@ -334,6 +337,7 @@ function shuffleArray(array) {
 // 問題表示
 function displayQuestion() {
     const question = currentQuiz[currentIndex];
+    const choiceCount = question.choices.length;
 
     document.getElementById('current-num').textContent = currentIndex + 1;
     document.getElementById('question-no').textContent = question.id;
@@ -347,9 +351,19 @@ function displayQuestion() {
     // ブックマークボタン更新
     updateBookmarkButton(question.id);
 
+    // 問題タイプバッジを更新（四肢択一 or 五肢択一）
+    updateQuestionTypeBadge(choiceCount);
+
     // 選択肢表示
     const choicesContainer = document.getElementById('choices');
     choicesContainer.innerHTML = '';
+
+    // 5択の場合はクラスを追加
+    if (choiceCount === 5) {
+        choicesContainer.classList.add('five-choices');
+    } else {
+        choicesContainer.classList.remove('five-choices');
+    }
 
     question.choices.forEach((choice, index) => {
         const btn = document.createElement('button');
@@ -367,17 +381,42 @@ function displayQuestion() {
     document.getElementById('next-btn').classList.add('hidden');
 }
 
+// 問題タイプバッジを更新
+function updateQuestionTypeBadge(choiceCount) {
+    let badge = document.getElementById('question-type-badge');
+
+    // バッジが存在しない場合は作成
+    if (!badge) {
+        badge = document.createElement('span');
+        badge.id = 'question-type-badge';
+        badge.className = 'question-type-badge';
+        const questionNumber = document.querySelector('.question-number');
+        if (questionNumber) {
+            questionNumber.appendChild(badge);
+        }
+    }
+
+    // バッジのテキストとクラスを更新
+    if (choiceCount === 5) {
+        badge.textContent = '五肢択一';
+        badge.className = 'question-type-badge five-choice';
+    } else {
+        badge.textContent = '四肢択一';
+        badge.className = 'question-type-badge four-choice';
+    }
+}
+
 // 回答選択
 function selectAnswer(selected) {
     const question = currentQuiz[currentIndex];
-    const isCorrect = selected === question.answer;
+    const isCorrect = selected === question.correct;
 
     userAnswers.push({
         questionId: question.id,
         question: question.question,
         choices: question.choices,
         userAnswer: selected,
-        correctAnswer: question.answer,
+        correctAnswer: question.correct,
         isCorrect: isCorrect
     });
 
@@ -395,7 +434,7 @@ function selectAnswer(selected) {
         btn.classList.add('disabled');
         btn.onclick = null;
 
-        if (index + 1 === question.answer) {
+        if (index + 1 === question.correct) {
             btn.classList.add('correct');
         } else if (index + 1 === selected && !isCorrect) {
             btn.classList.add('wrong');
@@ -420,7 +459,7 @@ function selectAnswer(selected) {
         document.getElementById('feedback-icon').textContent = '❌';
         document.getElementById('feedback-text').textContent = '不正解';
         document.getElementById('correct-answer').textContent =
-            `正解は ${question.answer} です`;
+            `正解は ${question.correct} です`;
     }
 
     // 次へボタン表示
@@ -564,7 +603,7 @@ function filterReview(filter) {
 function toggleDarkMode() {
     document.body.classList.toggle('dark-mode');
     const isDark = document.body.classList.contains('dark-mode');
-    localStorage.setItem(STORAGE_KEYS.darkMode, isDark);
+    localStorage.setItem(DARK_MODE_KEY, isDark);
     updateDarkModeButton();
 }
 
@@ -607,7 +646,7 @@ function showStatsScreen() {
         weakList.innerHTML = '<p style="text-align: center; color: var(--text-light); padding: 20px;">苦手な問題はありません</p>';
     } else {
         wrongEntries.forEach(([id, data]) => {
-            const question = questions.find(q => q.id === parseInt(id));
+            const question = quizData.find(q => q.id === parseInt(id));
             if (question) {
                 const item = document.createElement('div');
                 item.className = 'weak-item';
@@ -665,11 +704,12 @@ function getModeLabel(mode) {
 
 // データリセット
 function resetAllData() {
-    if (confirm('全ての学習データをリセットしますか？\n（間違い記録、統計、ブックマークが削除されます）')) {
-        localStorage.removeItem(STORAGE_KEYS.wrongAnswers);
-        localStorage.removeItem(STORAGE_KEYS.stats);
-        localStorage.removeItem(STORAGE_KEYS.bookmarks);
-        localStorage.removeItem(STORAGE_KEYS.history);
+    const currentUser = UserManager.getCurrentUser();
+    if (confirm(`${currentUser}さんの学習データをリセットしますか？\n（間違い記録、統計、ブックマークが削除されます）`)) {
+        UserManager.removeUserData(STORAGE_BASE_KEYS.wrongAnswers);
+        UserManager.removeUserData(STORAGE_BASE_KEYS.stats);
+        UserManager.removeUserData(STORAGE_BASE_KEYS.bookmarks);
+        UserManager.removeUserData(STORAGE_BASE_KEYS.history);
         alert('データをリセットしました');
         goHome();
     }
@@ -716,3 +756,32 @@ function bookmarkCurrentQuestion() {
     const question = currentQuiz[currentIndex];
     toggleBookmark(question.id);
 }
+
+// キーボードショートカット
+document.addEventListener('keydown', (e) => {
+    // クイズ画面でのみ有効
+    const quizScreen = document.getElementById('quiz-screen');
+    if (!quizScreen || !quizScreen.classList.contains('active')) return;
+
+    // 選択肢が無効化されているか確認
+    const choiceButtons = document.querySelectorAll('.choice-btn');
+    const isAnswered = choiceButtons.length > 0 && choiceButtons[0].classList.contains('disabled');
+
+    // 1-5キーで回答選択（回答前のみ）
+    if (!isAnswered && ['1', '2', '3', '4', '5'].includes(e.key)) {
+        const choiceIndex = parseInt(e.key);
+        if (choiceIndex <= choiceButtons.length) {
+            selectAnswer(choiceIndex);
+        }
+    }
+
+    // Enterキーまたはスペースキーで次へ（回答後のみ）
+    if (isAnswered && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault();
+        const nextBtn = document.getElementById('next-btn');
+        if (nextBtn && !nextBtn.classList.contains('hidden')) {
+            nextBtn.click();
+        }
+    }
+});
+

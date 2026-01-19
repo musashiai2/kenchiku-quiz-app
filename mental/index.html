@@ -116,7 +116,10 @@
                 </div>
                 <div id="question-text" class="question-text"></div>
                 <div id="question-data" class="question-data"></div>
+                <div id="choices-container" class="choices hidden"></div>
             </div>
+
+            <div id="quiz-feedback" class="feedback hidden"></div>
 
             <div id="answer-section" class="answer-section hidden">
                 <div class="answer-header">&#128161; 解答・解説</div>
@@ -128,11 +131,14 @@
                     <span class="btn-icon">&#128065;</span>解答を表示
                 </button>
                 <div id="next-controls" class="next-controls hidden">
-                    <button class="btn btn-secondary" onclick="markDifficult()">
+                    <button id="flashcard-controls-difficult" class="btn btn-secondary" onclick="markDifficult()">
                         <span class="btn-icon">&#128534;</span>難しい
                     </button>
-                    <button class="btn btn-success" onclick="markEasy()">
+                    <button id="flashcard-controls-easy" class="btn btn-success" onclick="markEasy()">
                         <span class="btn-icon">&#128077;</span>わかった
+                    </button>
+                    <button id="quiz-next-btn" class="btn btn-primary hidden" onclick="nextQuestion()">
+                        <span class="btn-icon">&#8594;</span>次の問題
                     </button>
                 </div>
             </div>
@@ -208,6 +214,7 @@
         </div>
     </div>
 
+    <script src="../user-manager.js"></script>
     <script src="questions.js"></script>
     <script src="app.js"></script>
 </body>
