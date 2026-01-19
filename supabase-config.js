@@ -6,11 +6,11 @@
  */
 
 const SUPABASE_CONFIG = {
-    // Replace with your Supabase project URL
-    url: 'YOUR_SUPABASE_URL',
+    // Supabase project URL
+    url: 'https://ueswjzptfhnvzcqkmgbs.supabase.co',
 
-    // Replace with your Supabase anon/public key
-    anonKey: 'YOUR_SUPABASE_ANON_KEY'
+    // Supabase anon/public key
+    anonKey: 'sb_publishable_Lx9KSyvFoHxIyKYQUAUVgQ_kVeP61XM'
 };
 
 // Initialize Supabase client
