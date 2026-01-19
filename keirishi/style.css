@@ -802,6 +802,34 @@ body.dark-mode .choice-btn.wrong {
     font-size: 0.95rem;
 }
 
+/* 解説表示 */
+.explanation {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--bg-color);
+    border-radius: 12px;
+    text-align: left;
+    border-left: 4px solid var(--info-color);
+}
+
+.explanation-title {
+    font-weight: 700;
+    color: var(--info-color);
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.explanation-content {
+    font-size: 0.9rem;
+    line-height: 1.8;
+    color: var(--text-color);
+    white-space: pre-wrap;
+}
+
+.explanation.hidden {
+    display: none;
+}
+
 /* クイズコントロール */
 .quiz-controls {
     text-align: center;
@@ -1576,4 +1604,192 @@ body.dark-mode .explanation-section.correct-section {
     .history-date {
         grid-column: 1 / -1;
     }
+}
+
+/* =====================
+   合格ライン比較表示
+   ===================== */
+.pass-line-comparison {
+    margin: 16px 0;
+}
+
+.pass-line-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 16px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.pass-line-display.passed {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.25) 100%);
+    border: 2px solid var(--success-color);
+    color: var(--success-color);
+}
+
+.pass-line-display.failed {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.25) 100%);
+    border: 2px solid var(--error-color);
+    color: var(--error-color);
+}
+
+.pass-line-label {
+    color: var(--text-light);
+}
+
+.pass-line-separator {
+    color: var(--text-light);
+    margin: 0 4px;
+}
+
+.your-score-label {
+    font-size: 1.2rem;
+}
+
+.pass-result-badge {
+    padding: 4px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    margin-left: 8px;
+}
+
+.pass-line-display.passed .pass-result-badge {
+    background: var(--success-color);
+    color: white;
+}
+
+.pass-line-display.failed .pass-result-badge {
+    background: var(--error-color);
+    color: white;
+}
+
+/* =====================
+   結果画面 苦手分野分析
+   ===================== */
+.result-analysis-section {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: var(--shadow);
+}
+
+.result-analysis-section h3 {
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.result-weak-analysis {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.weak-category-advice {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.2) 100%);
+    border-radius: 12px;
+    border-left: 4px solid var(--warning-color);
+    margin-bottom: 8px;
+}
+
+.advice-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.advice-text {
+    font-size: 0.95rem;
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.advice-text strong {
+    color: var(--warning-color);
+}
+
+.session-category-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.session-category-item {
+    background: var(--bg-color);
+    border-radius: 10px;
+    padding: 12px;
+    transition: all 0.2s ease;
+}
+
+.session-category-item.weak {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.15) 100%);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.session-category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.session-category-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-color);
+}
+
+.session-category-accuracy {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.session-category-item.weak .session-category-accuracy {
+    color: var(--error-color);
+}
+
+.session-category-bar {
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.session-category-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.session-category-item.weak .session-category-fill {
+    background: linear-gradient(90deg, var(--error-color), #f87171);
+}
+
+.session-category-detail {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
+.weak-badge {
+    background: var(--error-color);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
 }

@@ -8,6 +8,28 @@ let timerInterval = null;
 let timeRemaining = 0;
 let isTimerMode = false;
 let selectedAnswers = []; // 五肢二択用の選択状態
+let isMockExamMode = false;
+let mockExamStartTime = null;
+let mockExamType = null; // 'am' or 'pm'
+
+// 本番形式模擬試験の設定
+const MOCK_EXAM_CONFIG = {
+    am: {
+        questionCount: 44,
+        timeLimit: 150 * 60, // 2時間30分 = 150分 = 9000秒
+        startQuestion: 1,
+        endQuestion: 44,
+        name: '午前の部'
+    },
+    pm: {
+        questionCount: 28,
+        timeLimit: 120 * 60, // 2時間 = 120分 = 7200秒
+        startQuestion: 45,
+        endQuestion: 72,
+        name: '午後の部'
+    }
+};
+const PASS_RATE = 60; // 合格ライン60%
 
 // LocalStorage キー基底 (令和3年度用) - ユーザープレフィックスは UserManager が付与
 const STORAGE_BASE_KEYS = {
@@ -633,6 +655,9 @@ function nextQuestion() {
     window.scrollTo(0, 0);
 }
 
+// 合格ライン（1級建築施工管理技士: 60%）
+const PASS_LINE = 60;
+
 // 結果表示
 function showResult() {
     // タイマー停止
@@ -653,6 +678,20 @@ function showResult() {
     document.getElementById('result-total').textContent = total;
     document.getElementById('result-rate').textContent = rate;
 
+    // 合格ライン比較表示
+    const passLineComparison = document.getElementById('pass-line-comparison');
+    if (passLineComparison) {
+        const isPassed = rate >= PASS_LINE;
+        passLineComparison.innerHTML = `
+            <div class="pass-line-display ${isPassed ? 'passed' : 'failed'}">
+                <span class="pass-line-label">合格ライン: ${PASS_LINE}%</span>
+                <span class="pass-line-separator">/</span>
+                <span class="your-score-label">あなた: ${rate}%</span>
+                <span class="pass-result-badge">${isPassed ? '合格' : '不合格'}</span>
+            </div>
+        `;
+    }
+
     // メッセージ設定
     const messageEl = document.getElementById('result-message');
     messageEl.className = 'result-message';
@@ -663,9 +702,9 @@ function showResult() {
     } else if (rate >= 70) {
         messageEl.classList.add('good');
         messageEl.textContent = '良い成績です！合格ラインクリア！';
-    } else if (rate >= 60) {
+    } else if (rate >= PASS_LINE) {
         messageEl.classList.add('pass');
-        messageEl.textContent = 'もう少しで合格ライン！頑張りましょう！';
+        messageEl.textContent = '合格ラインクリア！さらに上を目指しましょう！';
     } else {
         messageEl.classList.add('fail');
         messageEl.textContent = '復習が必要です。繰り返し学習しましょう！';
@@ -675,8 +714,98 @@ function showResult() {
     const wrongCount = userAnswers.filter(a => !a.isCorrect).length;
     document.getElementById('wrong-in-session').textContent = wrongCount;
 
+    // 苦手分野分析を表示（問題番号ベース）
+    displayWeakAnalysis();
+
     showScreen('result-screen');
     window.scrollTo(0, 0);
+}
+
+// 苦手分野分析を結果画面に表示（午前/午後で分析）
+function displayWeakAnalysis() {
+    const container = document.getElementById('result-weak-analysis');
+    if (!container) return;
+
+    // 午前（1-50）と午後（51-100）で分けて正答率を計算
+    const amQuestions = userAnswers.filter(a => a.questionId <= 50);
+    const pmQuestions = userAnswers.filter(a => a.questionId > 50);
+
+    const categoryResults = [];
+
+    if (amQuestions.length > 0) {
+        const amCorrect = amQuestions.filter(a => a.isCorrect).length;
+        const amAccuracy = Math.round((amCorrect / amQuestions.length) * 100);
+        categoryResults.push({
+            name: '午前問題',
+            correct: amCorrect,
+            total: amQuestions.length,
+            accuracy: amAccuracy
+        });
+    }
+
+    if (pmQuestions.length > 0) {
+        const pmCorrect = pmQuestions.filter(a => a.isCorrect).length;
+        const pmAccuracy = Math.round((pmCorrect / pmQuestions.length) * 100);
+        categoryResults.push({
+            name: '午後問題',
+            correct: pmCorrect,
+            total: pmQuestions.length,
+            accuracy: pmAccuracy
+        });
+    }
+
+    // 正答率が低い順にソート
+    categoryResults.sort((a, b) => a.accuracy - b.accuracy);
+
+    // 苦手分野（正答率50%未満）を抽出
+    const weakCategories = categoryResults.filter(c => c.accuracy < 50);
+
+    container.innerHTML = '';
+
+    if (categoryResults.length === 0) {
+        container.innerHTML = '<p class="no-data-message">分析データがありません</p>';
+        return;
+    }
+
+    // 苦手分野がある場合のアドバイス
+    if (weakCategories.length > 0) {
+        const adviceDiv = document.createElement('div');
+        adviceDiv.className = 'weak-category-advice';
+        const weakNames = weakCategories.map(c => c.name).join('、');
+        adviceDiv.innerHTML = `
+            <div class="advice-icon">&#128161;</div>
+            <div class="advice-text">
+                <strong>${weakNames}</strong>を重点的に学習しましょう
+            </div>
+        `;
+        container.appendChild(adviceDiv);
+    }
+
+    // 分野別の正答率を表示
+    const statsDiv = document.createElement('div');
+    statsDiv.className = 'session-category-stats';
+
+    categoryResults.forEach(category => {
+        const isWeak = category.accuracy < 50;
+        const item = document.createElement('div');
+        item.className = `session-category-item${isWeak ? ' weak' : ''}`;
+        item.innerHTML = `
+            <div class="session-category-header">
+                <span class="session-category-name">${category.name}</span>
+                <span class="session-category-accuracy">${category.accuracy}%</span>
+            </div>
+            <div class="session-category-bar">
+                <div class="session-category-fill" style="width: ${category.accuracy}%"></div>
+            </div>
+            <div class="session-category-detail">
+                ${category.correct}/${category.total}問正解
+                ${isWeak ? '<span class="weak-badge">要復習</span>' : ''}
+            </div>
+        `;
+        statsDiv.appendChild(item);
+    });
+
+    container.appendChild(statsDiv);
 }
 
 // 解答確認
@@ -1047,4 +1176,198 @@ document.addEventListener('keydown', (e) => {
         }
     }
 });
+
+// =====================
+// 本番形式模擬試験
+// =====================
+
+// 模擬試験開始
+function startMockExam(type) {
+    const config = MOCK_EXAM_CONFIG[type];
+    if (!config) {
+        alert('無効な試験タイプです');
+        return;
+    }
+
+    // 確認ダイアログ
+    const confirmMsg = `【${config.name}】\n\n` +
+        `問題数: ${config.questionCount}問\n` +
+        `制限時間: ${Math.floor(config.timeLimit / 60)}分\n` +
+        `合格ライン: ${PASS_RATE}%以上\n\n` +
+        `本番形式で開始しますか？\n` +
+        `※途中で中断すると記録されません`;
+
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+
+    // 模擬試験モードを設定
+    isMockExamMode = true;
+    mockExamType = type;
+    mockExamStartTime = new Date();
+    quizMode = 'mock_' + type;
+    currentIndex = 0;
+    correctCount = 0;
+    userAnswers = [];
+    isTimerMode = true;
+
+    // 問題を選択（問題IDの範囲で選択）
+    currentQuiz = quizData.filter(q =>
+        q.id >= config.startQuestion && q.id <= config.endQuestion
+    );
+
+    // 問題数が足りない場合は警告
+    if (currentQuiz.length < config.questionCount) {
+        console.warn(`問題数が不足しています: ${currentQuiz.length}/${config.questionCount}`);
+    }
+
+    // 問題数を制限
+    currentQuiz = currentQuiz.slice(0, config.questionCount);
+
+    if (currentQuiz.length === 0) {
+        alert('該当する問題がありません');
+        isMockExamMode = false;
+        return;
+    }
+
+    document.getElementById('total-num').textContent = currentQuiz.length;
+
+    // タイマー設定
+    timeRemaining = config.timeLimit;
+    document.getElementById('timer-display').classList.remove('hidden');
+    startTimer();
+
+    showScreen('quiz-screen');
+    displayQuestion();
+}
+
+// 結果表示（模擬試験用の拡張）
+function showMockExamResult() {
+    const total = currentQuiz.length;
+    const rate = Math.round((correctCount / total) * 100);
+    const isPassed = rate >= PASS_RATE;
+    const config = MOCK_EXAM_CONFIG[mockExamType];
+
+    // 模擬試験結果表示
+    const mockExamResultEl = document.getElementById('mock-exam-result');
+    const passFailBadge = document.getElementById('pass-fail-badge');
+    const passFailText = document.getElementById('pass-fail-text');
+    const timeInfoEl = document.getElementById('mock-exam-time-info');
+
+    if (mockExamResultEl) {
+        mockExamResultEl.classList.remove('hidden');
+
+        // 合否判定
+        if (isPassed) {
+            passFailBadge.className = 'pass-fail-badge passed';
+            passFailText.textContent = '合格';
+        } else {
+            passFailBadge.className = 'pass-fail-badge failed';
+            passFailText.textContent = '不合格';
+        }
+
+        // 所要時間計算
+        const endTime = new Date();
+        const elapsedMs = endTime - mockExamStartTime;
+        const elapsedMinutes = Math.floor(elapsedMs / 60000);
+        const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
+
+        // 残り時間または経過時間を表示
+        if (timeRemaining > 0) {
+            const remainMinutes = Math.floor(timeRemaining / 60);
+            const remainSeconds = timeRemaining % 60;
+            timeInfoEl.innerHTML = `
+                <strong>${config.name}</strong><br>
+                所要時間: ${elapsedMinutes}分${elapsedSeconds}秒<br>
+                残り時間: ${remainMinutes}分${remainSeconds}秒<br>
+                合格ライン: ${PASS_RATE}%
+            `;
+        } else {
+            timeInfoEl.innerHTML = `
+                <strong>${config.name}</strong><br>
+                時間切れ<br>
+                合格ライン: ${PASS_RATE}%
+            `;
+        }
+    }
+}
+
+// 結果表示を拡張（既存のshowResultを上書き）
+const originalShowResult = showResult;
+showResult = function() {
+    // タイマー停止
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+
+    const total = currentQuiz.length;
+    const rate = Math.round((correctCount / total) * 100);
+
+    // 統計保存
+    saveStats(correctCount, total, quizMode);
+    saveHistory(userAnswers);
+
+    document.getElementById('final-score').textContent = correctCount;
+    document.getElementById('result-correct').textContent = correctCount;
+    document.getElementById('result-total').textContent = total;
+    document.getElementById('result-rate').textContent = rate;
+
+    // 模擬試験モードの場合は合否判定を表示
+    const mockExamResultEl = document.getElementById('mock-exam-result');
+    if (isMockExamMode && mockExamResultEl) {
+        showMockExamResult();
+    } else if (mockExamResultEl) {
+        mockExamResultEl.classList.add('hidden');
+    }
+
+    // メッセージ設定
+    const messageEl = document.getElementById('result-message');
+    messageEl.className = 'result-message';
+
+    if (isMockExamMode) {
+        const isPassed = rate >= PASS_RATE;
+        if (isPassed) {
+            if (rate >= 90) {
+                messageEl.classList.add('excellent');
+                messageEl.textContent = '素晴らしい！高得点で合格です！';
+            } else if (rate >= 70) {
+                messageEl.classList.add('good');
+                messageEl.textContent = '合格です！良い成績です！';
+            } else {
+                messageEl.classList.add('pass');
+                messageEl.textContent = '合格です！引き続き学習を続けましょう！';
+            }
+        } else {
+            messageEl.classList.add('fail');
+            messageEl.textContent = `不合格です。合格まであと${Math.ceil(total * PASS_RATE / 100) - correctCount}問必要です。`;
+        }
+    } else {
+        if (rate >= 90) {
+            messageEl.classList.add('excellent');
+            messageEl.textContent = '素晴らしい！ほぼ完璧です！';
+        } else if (rate >= 70) {
+            messageEl.classList.add('good');
+            messageEl.textContent = '良い成績です！合格ラインクリア！';
+        } else if (rate >= 60) {
+            messageEl.classList.add('pass');
+            messageEl.textContent = 'もう少しで合格ライン！頑張りましょう！';
+        } else {
+            messageEl.classList.add('fail');
+            messageEl.textContent = '復習が必要です。繰り返し学習しましょう！';
+        }
+    }
+
+    // 間違えた問題の数を表示
+    const wrongCount = userAnswers.filter(a => !a.isCorrect).length;
+    document.getElementById('wrong-in-session').textContent = wrongCount;
+
+    showScreen('result-screen');
+    window.scrollTo(0, 0);
+
+    // 模擬試験モードをリセット
+    isMockExamMode = false;
+    mockExamType = null;
+    mockExamStartTime = null;
+};
 

@@ -743,6 +743,23 @@ function selectChoice(selectedNumber) {
 
     // 解説を表示
     showExplanation(question.answer);
+
+    // フィードバック内に解説を表示（R1形式）
+    const explanationEl = document.getElementById('explanation');
+    if (explanationEl && question.answer) {
+        // 【解説】部分を抽出
+        const explanationMatch = question.answer.match(/【解説】([\s\S]*?)$/);
+        if (explanationMatch) {
+            explanationEl.innerHTML = `
+                <div class="explanation-title">【解説】</div>
+                <div class="explanation-content">${explanationMatch[1].trim()}</div>
+            `;
+            explanationEl.classList.remove('hidden');
+        } else {
+            explanationEl.classList.add('hidden');
+        }
+    }
+
     document.getElementById('next-btn').classList.remove('hidden');
 }
 
@@ -836,6 +853,9 @@ function nextQuestion() {
     }
 }
 
+// 合格ライン（建設業経理士: 70%）
+const PASS_LINE = 70;
+
 // クイズ終了
 function finishQuiz() {
     stopTimer();
@@ -853,15 +873,29 @@ function finishQuiz() {
     document.getElementById('result-rate').textContent = score;
     document.getElementById('wrong-in-session').textContent = wrongInSession.length;
 
+    // 合格ライン比較表示
+    const passLineComparison = document.getElementById('pass-line-comparison');
+    if (passLineComparison) {
+        const isPassed = score >= PASS_LINE;
+        passLineComparison.innerHTML = `
+            <div class="pass-line-display ${isPassed ? 'passed' : 'failed'}">
+                <span class="pass-line-label">合格ライン: ${PASS_LINE}%</span>
+                <span class="pass-line-separator">/</span>
+                <span class="your-score-label">あなた: ${score}%</span>
+                <span class="pass-result-badge">${isPassed ? '合格' : '不合格'}</span>
+            </div>
+        `;
+    }
+
     const messageEl = document.getElementById('result-message');
     messageEl.className = 'result-message';
 
     if (score >= 90) {
         messageEl.classList.add('excellent');
         messageEl.textContent = '素晴らしい！完璧な成績です！';
-    } else if (score >= 70) {
+    } else if (score >= PASS_LINE) {
         messageEl.classList.add('good');
-        messageEl.textContent = 'よくできました！この調子で頑張りましょう！';
+        messageEl.textContent = 'よくできました！合格ラインクリア！';
     } else if (score >= 50) {
         messageEl.classList.add('pass');
         messageEl.textContent = 'もう少しです。復習して再挑戦しましょう！';
@@ -870,7 +904,92 @@ function finishQuiz() {
         messageEl.textContent = '基礎からしっかり復習しましょう。';
     }
 
+    // 苦手分野分析を表示
+    displayWeakCategoryAnalysis();
+
     showScreen('result-screen');
+}
+
+// 苦手分野分析を結果画面に表示
+function displayWeakCategoryAnalysis() {
+    const container = document.getElementById('result-weak-analysis');
+    if (!container) return;
+
+    // 今回のセッションでの分野別正答率を計算
+    const categoryResults = {};
+    userAnswers.forEach(answer => {
+        const question = currentQuestions.find(q => q.id === answer.questionId);
+        if (question) {
+            const category = question.type || '未分類';
+            if (!categoryResults[category]) {
+                categoryResults[category] = { correct: 0, total: 0 };
+            }
+            categoryResults[category].total++;
+            if (answer.isCorrect) {
+                categoryResults[category].correct++;
+            }
+        }
+    });
+
+    // 正答率が低い順にソート
+    const sortedCategories = Object.entries(categoryResults)
+        .map(([name, stats]) => ({
+            name,
+            correct: stats.correct,
+            total: stats.total,
+            accuracy: Math.round((stats.correct / stats.total) * 100)
+        }))
+        .sort((a, b) => a.accuracy - b.accuracy);
+
+    // 苦手分野（正答率50%未満）を抽出
+    const weakCategories = sortedCategories.filter(c => c.accuracy < 50);
+
+    container.innerHTML = '';
+
+    if (sortedCategories.length === 0) {
+        container.innerHTML = '<p class="no-data-message">分野データがありません</p>';
+        return;
+    }
+
+    // 苦手分野がある場合のアドバイス
+    if (weakCategories.length > 0) {
+        const adviceDiv = document.createElement('div');
+        adviceDiv.className = 'weak-category-advice';
+        const weakNames = weakCategories.map(c => c.name).join('、');
+        adviceDiv.innerHTML = `
+            <div class="advice-icon">&#128161;</div>
+            <div class="advice-text">
+                <strong>${weakNames}</strong>の分野を重点的に学習しましょう
+            </div>
+        `;
+        container.appendChild(adviceDiv);
+    }
+
+    // 分野別の正答率を表示
+    const statsDiv = document.createElement('div');
+    statsDiv.className = 'session-category-stats';
+
+    sortedCategories.forEach(category => {
+        const isWeak = category.accuracy < 50;
+        const item = document.createElement('div');
+        item.className = `session-category-item${isWeak ? ' weak' : ''}`;
+        item.innerHTML = `
+            <div class="session-category-header">
+                <span class="session-category-name">${category.name}</span>
+                <span class="session-category-accuracy">${category.accuracy}%</span>
+            </div>
+            <div class="session-category-bar">
+                <div class="session-category-fill" style="width: ${category.accuracy}%"></div>
+            </div>
+            <div class="session-category-detail">
+                ${category.correct}/${category.total}問正解
+                ${isWeak ? '<span class="weak-badge">要復習</span>' : ''}
+            </div>
+        `;
+        statsDiv.appendChild(item);
+    });
+
+    container.appendChild(statsDiv);
 }
 
 // 解答確認

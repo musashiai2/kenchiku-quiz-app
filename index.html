@@ -16,6 +16,7 @@
             --accent-color: #8b5cf6;
             --secondary-color: #10b981;
             --warning-color: #f59e0b;
+            --danger-color: #ef4444;
             --bg-color: #f1f5f9;
             --card-bg: #ffffff;
             --text-color: #1e293b;
@@ -144,6 +145,227 @@
             margin-top: 15px;
             font-weight: 600;
             font-size: 0.9rem;
+        }
+
+        /* ===================== */
+        /* Dashboard Styles */
+        /* ===================== */
+        .dashboard {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .dashboard-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .dashboard-header h2 {
+            color: var(--primary-color);
+            font-size: 1.3rem;
+        }
+
+        .dashboard-icon {
+            font-size: 1.5rem;
+        }
+
+        /* Overall Stats */
+        .overall-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .overall-stat-card {
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            color: white;
+        }
+
+        .overall-stat-card.green {
+            background: linear-gradient(135deg, var(--secondary-color), #059669);
+        }
+
+        .overall-stat-card.orange {
+            background: linear-gradient(135deg, var(--warning-color), #d97706);
+        }
+
+        .overall-stat-card.purple {
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+        }
+
+        .overall-stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .overall-stat-label {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+
+        /* Qualification Cards */
+        .qualification-stats {
+            margin-top: 20px;
+        }
+
+        .qualification-stats-title {
+            font-size: 1rem;
+            color: var(--text-color);
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+
+        .qualification-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .qualification-card {
+            background: var(--bg-color);
+            border-radius: 14px;
+            padding: 16px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .qualification-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .qualification-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+        }
+
+        .qualification-card.green::before {
+            background: linear-gradient(90deg, var(--secondary-color), #059669);
+        }
+
+        .qualification-card.orange::before {
+            background: linear-gradient(90deg, var(--warning-color), #d97706);
+        }
+
+        .qualification-card.purple::before {
+            background: linear-gradient(90deg, #8b5cf6, #6d28d9);
+        }
+
+        .qualification-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .qualification-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-color);
+        }
+
+        .pass-status {
+            font-size: 1.2rem;
+        }
+
+        .qualification-stats-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .qualification-stat {
+            text-align: center;
+            padding: 8px;
+            background: var(--card-bg);
+            border-radius: 8px;
+        }
+
+        .qualification-stat-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .qualification-card.green .qualification-stat-value {
+            color: var(--secondary-color);
+        }
+
+        .qualification-card.orange .qualification-stat-value {
+            color: var(--warning-color);
+        }
+
+        .qualification-card.purple .qualification-stat-value {
+            color: #8b5cf6;
+        }
+
+        .qualification-stat-label {
+            font-size: 0.7rem;
+            color: var(--text-light);
+        }
+
+        .last-study {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            text-align: right;
+            margin-top: 8px;
+        }
+
+        .no-data-message {
+            text-align: center;
+            color: var(--text-light);
+            padding: 20px;
+            font-size: 0.9rem;
+        }
+
+        /* Progress Bar */
+        .progress-bar-container {
+            background: var(--card-bg);
+            border-radius: 6px;
+            height: 8px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-bar-fill.excellent {
+            background: linear-gradient(90deg, var(--secondary-color), #059669);
+        }
+
+        .progress-bar-fill.good {
+            background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+        }
+
+        .progress-bar-fill.warning {
+            background: linear-gradient(90deg, var(--warning-color), #d97706);
+        }
+
+        .progress-bar-fill.danger {
+            background: linear-gradient(90deg, var(--danger-color), #dc2626);
         }
 
         .section {
@@ -332,6 +554,18 @@
             .container {
                 padding: 12px;
             }
+
+            .overall-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .qualification-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .overall-stat-value {
+                font-size: 1.5rem;
+            }
         }
     </style>
 </head>
@@ -345,6 +579,42 @@
             <h1>資格試験クイズアプリ</h1>
             <p>建築・不動産・会計・メンタルヘルス関連資格</p>
             <span class="badge">複数資格対応</span>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div class="dashboard" id="dashboard">
+            <div class="dashboard-header">
+                <span class="dashboard-icon">📊</span>
+                <h2>学習進捗ダッシュボード</h2>
+            </div>
+
+            <!-- Overall Stats -->
+            <div class="overall-stats" id="overall-stats">
+                <div class="overall-stat-card">
+                    <div class="overall-stat-value" id="total-accuracy">--%</div>
+                    <div class="overall-stat-label">全体正答率</div>
+                </div>
+                <div class="overall-stat-card green">
+                    <div class="overall-stat-value" id="total-questions-studied">0</div>
+                    <div class="overall-stat-label">学習問題数</div>
+                </div>
+                <div class="overall-stat-card orange">
+                    <div class="overall-stat-value" id="streak-days">0日</div>
+                    <div class="overall-stat-label">連続学習</div>
+                </div>
+                <div class="overall-stat-card purple">
+                    <div class="overall-stat-value" id="weekly-questions">0</div>
+                    <div class="overall-stat-label">今週の問題数</div>
+                </div>
+            </div>
+
+            <!-- Qualification Stats -->
+            <div class="qualification-stats">
+                <div class="qualification-stats-title">資格別 学習状況</div>
+                <div class="qualification-grid" id="qualification-grid">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
         </div>
 
         <div class="features">
@@ -470,6 +740,269 @@
 
     <script src="user-manager.js"></script>
     <script>
+        // 資格情報の定義
+        const QUALIFICATIONS = [
+            {
+                id: 'sekoukanri1',
+                name: '1級建築施工管理技士',
+                statsKeys: ['stats_r1', 'stats_r2', 'stats_r3', 'stats_r4', 'stats_r5', 'stats_r6', 'stats_r7'],
+                passLine: 60,
+                colorClass: ''
+            },
+            {
+                id: 'takken',
+                name: '宅地建物取引士',
+                statsKeys: ['stats_takken'],
+                passLine: 70,
+                colorClass: 'green'
+            },
+            {
+                id: 'kenchikushi',
+                name: '2級建築士',
+                statsKeys: ['stats_kenchikushi'],
+                passLine: 60,
+                colorClass: 'orange'
+            },
+            {
+                id: 'keirishi',
+                name: '建設業経理士2級',
+                statsKeys: ['stats_keirishi'],
+                passLine: 70,
+                colorClass: 'purple'
+            },
+            {
+                id: 'mental',
+                name: 'メンタルヘルス検定',
+                statsKeys: ['stats_mental'],
+                passLine: 70,
+                colorClass: ''
+            }
+        ];
+
+        // ダッシュボードデータを取得
+        function getDashboardData() {
+            const currentUser = UserManager.getCurrentUser();
+            if (!currentUser) return null;
+
+            const userPrefix = 'quiz_user_' + currentUser + '_';
+            const qualificationData = [];
+            let totalCorrect = 0;
+            let totalQuestions = 0;
+            const allSessions = [];
+
+            // 各資格のデータを集計
+            QUALIFICATIONS.forEach(qual => {
+                let qualCorrect = 0;
+                let qualTotal = 0;
+                let lastStudyDate = null;
+                const sessions = [];
+
+                qual.statsKeys.forEach(key => {
+                    const data = localStorage.getItem(userPrefix + key);
+                    if (data) {
+                        try {
+                            const stats = JSON.parse(data);
+                            qualCorrect += stats.totalCorrect || 0;
+                            qualTotal += stats.totalQuestions || 0;
+
+                            if (stats.sessions) {
+                                stats.sessions.forEach(session => {
+                                    sessions.push(session);
+                                    allSessions.push(session);
+                                    const sessionDate = new Date(session.date);
+                                    if (!lastStudyDate || sessionDate > lastStudyDate) {
+                                        lastStudyDate = sessionDate;
+                                    }
+                                });
+                            }
+                        } catch (e) {
+                            console.error('Error parsing stats:', key, e);
+                        }
+                    }
+                });
+
+                const accuracy = qualTotal > 0 ? Math.round((qualCorrect / qualTotal) * 100) : null;
+                const isPassed = accuracy !== null && accuracy >= qual.passLine;
+
+                qualificationData.push({
+                    ...qual,
+                    correct: qualCorrect,
+                    total: qualTotal,
+                    accuracy: accuracy,
+                    isPassed: isPassed,
+                    lastStudyDate: lastStudyDate,
+                    sessions: sessions
+                });
+
+                totalCorrect += qualCorrect;
+                totalQuestions += qualTotal;
+            });
+
+            // 連続学習日数を計算
+            const streakDays = calculateStreakDays(allSessions);
+
+            // 今週の学習問題数を計算
+            const weeklyQuestions = calculateWeeklyQuestions(allSessions);
+
+            return {
+                qualifications: qualificationData,
+                totalCorrect: totalCorrect,
+                totalQuestions: totalQuestions,
+                totalAccuracy: totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : null,
+                streakDays: streakDays,
+                weeklyQuestions: weeklyQuestions
+            };
+        }
+
+        // 連続学習日数を計算
+        function calculateStreakDays(sessions) {
+            if (sessions.length === 0) return 0;
+
+            // セッション日付を取得してソート
+            const studyDates = sessions.map(s => {
+                const date = new Date(s.date);
+                return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+            });
+            const uniqueDates = [...new Set(studyDates)].sort((a, b) => b - a);
+
+            if (uniqueDates.length === 0) return 0;
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayTime = today.getTime();
+
+            // 今日または昨日から開始しているかチェック
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayTime = yesterday.getTime();
+
+            if (uniqueDates[0] !== todayTime && uniqueDates[0] !== yesterdayTime) {
+                return 0; // 連続が途切れている
+            }
+
+            let streak = 1;
+            let currentDate = uniqueDates[0];
+
+            for (let i = 1; i < uniqueDates.length; i++) {
+                const prevDate = new Date(currentDate);
+                prevDate.setDate(prevDate.getDate() - 1);
+
+                if (uniqueDates[i] === prevDate.getTime()) {
+                    streak++;
+                    currentDate = uniqueDates[i];
+                } else {
+                    break;
+                }
+            }
+
+            return streak;
+        }
+
+        // 今週の学習問題数を計算
+        function calculateWeeklyQuestions(sessions) {
+            const now = new Date();
+            const startOfWeek = new Date(now);
+            startOfWeek.setDate(now.getDate() - now.getDay());
+            startOfWeek.setHours(0, 0, 0, 0);
+
+            let weeklyTotal = 0;
+            sessions.forEach(session => {
+                const sessionDate = new Date(session.date);
+                if (sessionDate >= startOfWeek) {
+                    weeklyTotal += session.total || 0;
+                }
+            });
+
+            return weeklyTotal;
+        }
+
+        // ダッシュボードを更新
+        function updateDashboard() {
+            const data = getDashboardData();
+
+            if (!data) {
+                document.getElementById('qualification-grid').innerHTML =
+                    '<p class="no-data-message">ユーザーを選択してください</p>';
+                return;
+            }
+
+            // 全体統計を更新
+            document.getElementById('total-accuracy').textContent =
+                data.totalAccuracy !== null ? data.totalAccuracy + '%' : '--%';
+            document.getElementById('total-questions-studied').textContent =
+                data.totalQuestions.toLocaleString();
+            document.getElementById('streak-days').textContent =
+                data.streakDays + '日';
+            document.getElementById('weekly-questions').textContent =
+                data.weeklyQuestions.toLocaleString();
+
+            // 資格別カードを生成
+            const grid = document.getElementById('qualification-grid');
+
+            if (data.qualifications.every(q => q.total === 0)) {
+                grid.innerHTML = '<p class="no-data-message">まだ学習データがありません。<br>各資格のクイズを解くと、ここに進捗が表示されます。</p>';
+                return;
+            }
+
+            grid.innerHTML = data.qualifications
+                .filter(qual => qual.total > 0)
+                .map(qual => {
+                    const progressClass = getProgressClass(qual.accuracy);
+                    const lastStudy = qual.lastStudyDate
+                        ? formatLastStudyDate(qual.lastStudyDate)
+                        : '--';
+
+                    return `
+                        <div class="qualification-card ${qual.colorClass}">
+                            <div class="qualification-card-header">
+                                <span class="qualification-name">${qual.name}</span>
+                                <span class="pass-status">${qual.isPassed ? '○' : '×'}</span>
+                            </div>
+                            <div class="qualification-stats-row">
+                                <div class="qualification-stat">
+                                    <div class="qualification-stat-value">${qual.accuracy !== null ? qual.accuracy + '%' : '--%'}</div>
+                                    <div class="qualification-stat-label">正答率</div>
+                                </div>
+                                <div class="qualification-stat">
+                                    <div class="qualification-stat-value">${qual.total}</div>
+                                    <div class="qualification-stat-label">学習問題数</div>
+                                </div>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-fill ${progressClass}" style="width: ${qual.accuracy || 0}%"></div>
+                            </div>
+                            <div class="last-study">最終学習: ${lastStudy}</div>
+                        </div>
+                    `;
+                }).join('');
+        }
+
+        // 正答率に応じた進捗バーのクラスを取得
+        function getProgressClass(accuracy) {
+            if (accuracy === null) return '';
+            if (accuracy >= 80) return 'excellent';
+            if (accuracy >= 60) return 'good';
+            if (accuracy >= 40) return 'warning';
+            return 'danger';
+        }
+
+        // 最終学習日をフォーマット
+        function formatLastStudyDate(date) {
+            const now = new Date();
+            const diffTime = now - date;
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 0) {
+                return '今日';
+            } else if (diffDays === 1) {
+                return '昨日';
+            } else if (diffDays < 7) {
+                return diffDays + '日前';
+            } else {
+                return (date.getMonth() + 1) + '/' + date.getDate();
+            }
+        }
+
         function toggleDarkMode() {
             document.body.classList.toggle('dark-mode');
             const isDark = document.body.classList.contains('dark-mode');
@@ -495,6 +1028,8 @@
             // Initialize user management
             UserManager.init((userName) => {
                 console.log('User ready:', userName);
+                // ダッシュボードを更新
+                updateDashboard();
             });
         });
     </script>

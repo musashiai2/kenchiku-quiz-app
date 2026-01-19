@@ -172,6 +172,7 @@
                 <div id="feedback-icon" class="feedback-icon"></div>
                 <div id="feedback-text" class="feedback-text"></div>
                 <div id="correct-answer" class="correct-answer"></div>
+                <div id="explanation" class="explanation hidden"></div>
             </div>
 
             <div id="answer-section" class="answer-section hidden">
@@ -212,7 +213,14 @@
                     <p>正答率: <span id="result-rate">0</span>%</p>
                     <p class="wrong-count-result">間違い: <span id="wrong-in-session">0</span>問</p>
                 </div>
+                <!-- 合格ライン比較 -->
+                <div id="pass-line-comparison" class="pass-line-comparison"></div>
                 <div id="result-message" class="result-message"></div>
+            </div>
+            <!-- 苦手分野分析 -->
+            <div class="result-analysis-section">
+                <h3>分野別正答率</h3>
+                <div id="result-weak-analysis" class="result-weak-analysis"></div>
             </div>
             <div class="result-actions">
                 <button class="btn btn-primary" onclick="reviewAnswers()">

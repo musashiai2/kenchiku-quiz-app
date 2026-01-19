@@ -139,6 +139,42 @@
                 </div>
             </div>
 
+            <!-- 本番形式模擬試験 -->
+            <div class="mock-exam-section">
+                <h3>本番形式で挑戦</h3>
+                <p class="mock-exam-description">1級建築施工管理技術検定の本番と同じ形式・時間で挑戦できます</p>
+                <div class="mock-exam-info">
+                    <div class="mock-exam-detail">
+                        <span class="detail-label">午前の部</span>
+                        <span class="detail-value">44問 / 2時間30分</span>
+                    </div>
+                    <div class="mock-exam-detail">
+                        <span class="detail-label">午後の部</span>
+                        <span class="detail-value">28問 / 2時間</span>
+                    </div>
+                    <div class="mock-exam-detail">
+                        <span class="detail-label">合格ライン</span>
+                        <span class="detail-value">60%以上</span>
+                    </div>
+                </div>
+                <div class="mock-exam-buttons">
+                    <button class="btn btn-mock-exam" onclick="startMockExam('am')">
+                        <span class="btn-icon">&#128221;</span>
+                        <span class="btn-text">
+                            午前の部
+                            <span class="btn-sub">44問 / 2時間30分</span>
+                        </span>
+                    </button>
+                    <button class="btn btn-mock-exam" onclick="startMockExam('pm')">
+                        <span class="btn-icon">&#128221;</span>
+                        <span class="btn-text">
+                            午後の部
+                            <span class="btn-sub">28問 / 2時間</span>
+                        </span>
+                    </button>
+                </div>
+            </div>
+
             <div class="back-link" style="text-align: center; margin-top: 20px;">
                 <a href="../index.html" style="color: var(--primary-color); text-decoration: none;">← トップページに戻る</a>
             </div>
@@ -195,6 +231,15 @@
             <div class="result-header">
                 <h2>試験結果</h2>
             </div>
+            <!-- 模擬試験の合否判定 -->
+            <div id="mock-exam-result" class="mock-exam-result hidden">
+                <div id="pass-fail-badge" class="pass-fail-badge">
+                    <span id="pass-fail-text">合格</span>
+                </div>
+                <div class="mock-exam-result-details">
+                    <p id="mock-exam-time-info"></p>
+                </div>
+            </div>
             <div class="result-card">
                 <div class="score-circle">
                     <span id="final-score">0</span>
@@ -205,7 +250,14 @@
                     <p>正答率: <span id="result-rate">0</span>%</p>
                     <p class="wrong-count-result">間違い: <span id="wrong-in-session">0</span>問</p>
                 </div>
+                <!-- 合格ライン比較 -->
+                <div id="pass-line-comparison" class="pass-line-comparison"></div>
                 <div id="result-message" class="result-message"></div>
+            </div>
+            <!-- 苦手分野分析 -->
+            <div class="result-analysis-section">
+                <h3>午前/午後別正答率</h3>
+                <div id="result-weak-analysis" class="result-weak-analysis"></div>
             </div>
             <div class="result-actions">
                 <button class="btn btn-primary" onclick="reviewAnswers()">

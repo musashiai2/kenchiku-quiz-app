@@ -7,6 +7,28 @@ let quizMode = 'all';
 let timerInterval = null;
 let timeRemaining = 0;
 let isTimerMode = false;
+let isMockExamMode = false;
+let mockExamStartTime = null;
+let mockExamType = null; // 'am' or 'pm'
+
+// 模擬試験設定
+const MOCK_EXAM_CONFIG = {
+    am: {
+        questionCount: 44,
+        timeLimit: 150 * 60, // 2時間30分 = 9000秒
+        startQuestion: 1,
+        endQuestion: 44,
+        name: '午前の部'
+    },
+    pm: {
+        questionCount: 18,
+        timeLimit: 120 * 60, // 2時間 = 7200秒
+        startQuestion: 45,
+        endQuestion: 72,
+        name: '午後の部'
+    }
+};
+const PASS_RATE = 60;
 
 // LocalStorage キー基底 (令和7年度用) - ユーザープレフィックスは UserManager が付与
 const STORAGE_BASE_KEYS = {
@@ -498,6 +520,9 @@ function nextQuestion() {
     window.scrollTo(0, 0);
 }
 
+// 合格ライン（1級建築施工管理技士: 60%）
+const PASS_LINE = 60;
+
 // 結果表示
 function showResult() {
     // タイマー停止
@@ -518,6 +543,27 @@ function showResult() {
     document.getElementById('result-total').textContent = total;
     document.getElementById('result-rate').textContent = rate;
 
+    // 模擬試験モードの場合は合否判定を表示
+    if (isMockExamMode) {
+        showMockExamResult();
+    } else {
+        document.getElementById('mock-exam-result').classList.add('hidden');
+    }
+
+    // 合格ライン比較表示
+    const passLineComparison = document.getElementById('pass-line-comparison');
+    if (passLineComparison) {
+        const isPassed = rate >= PASS_LINE;
+        passLineComparison.innerHTML = `
+            <div class="pass-line-display ${isPassed ? 'passed' : 'failed'}">
+                <span class="pass-line-label">合格ライン: ${PASS_LINE}%</span>
+                <span class="pass-line-separator">/</span>
+                <span class="your-score-label">あなた: ${rate}%</span>
+                <span class="pass-result-badge">${isPassed ? '合格' : '不合格'}</span>
+            </div>
+        `;
+    }
+
     // メッセージ設定
     const messageEl = document.getElementById('result-message');
     messageEl.className = 'result-message';
@@ -528,9 +574,9 @@ function showResult() {
     } else if (rate >= 70) {
         messageEl.classList.add('good');
         messageEl.textContent = '良い成績です！合格ラインクリア！';
-    } else if (rate >= 60) {
+    } else if (rate >= PASS_LINE) {
         messageEl.classList.add('pass');
-        messageEl.textContent = 'もう少しで合格ライン！頑張りましょう！';
+        messageEl.textContent = '合格ラインクリア！さらに上を目指しましょう！';
     } else {
         messageEl.classList.add('fail');
         messageEl.textContent = '復習が必要です。繰り返し学習しましょう！';
@@ -540,8 +586,180 @@ function showResult() {
     const wrongCount = userAnswers.filter(a => !a.isCorrect).length;
     document.getElementById('wrong-in-session').textContent = wrongCount;
 
+    // 苦手分野分析を表示（問題番号ベース）
+    displayWeakAnalysis();
+
     showScreen('result-screen');
     window.scrollTo(0, 0);
+}
+
+// 苦手分野分析を結果画面に表示（午前/午後で分析）
+function displayWeakAnalysis() {
+    const container = document.getElementById('result-weak-analysis');
+    if (!container) return;
+
+    // 午前（1-50）と午後（51-100）で分けて正答率を計算
+    const amQuestions = userAnswers.filter(a => a.questionId <= 50);
+    const pmQuestions = userAnswers.filter(a => a.questionId > 50);
+
+    const categoryResults = [];
+
+    if (amQuestions.length > 0) {
+        const amCorrect = amQuestions.filter(a => a.isCorrect).length;
+        const amAccuracy = Math.round((amCorrect / amQuestions.length) * 100);
+        categoryResults.push({
+            name: '午前問題',
+            correct: amCorrect,
+            total: amQuestions.length,
+            accuracy: amAccuracy
+        });
+    }
+
+    if (pmQuestions.length > 0) {
+        const pmCorrect = pmQuestions.filter(a => a.isCorrect).length;
+        const pmAccuracy = Math.round((pmCorrect / pmQuestions.length) * 100);
+        categoryResults.push({
+            name: '午後問題',
+            correct: pmCorrect,
+            total: pmQuestions.length,
+            accuracy: pmAccuracy
+        });
+    }
+
+    // 正答率が低い順にソート
+    categoryResults.sort((a, b) => a.accuracy - b.accuracy);
+
+    // 苦手分野（正答率50%未満）を抽出
+    const weakCategories = categoryResults.filter(c => c.accuracy < 50);
+
+    container.innerHTML = '';
+
+    if (categoryResults.length === 0) {
+        container.innerHTML = '<p class="no-data-message">分析データがありません</p>';
+        return;
+    }
+
+    // 苦手分野がある場合のアドバイス
+    if (weakCategories.length > 0) {
+        const adviceDiv = document.createElement('div');
+        adviceDiv.className = 'weak-category-advice';
+        const weakNames = weakCategories.map(c => c.name).join('、');
+        adviceDiv.innerHTML = `
+            <div class="advice-icon">&#128161;</div>
+            <div class="advice-text">
+                <strong>${weakNames}</strong>を重点的に学習しましょう
+            </div>
+        `;
+        container.appendChild(adviceDiv);
+    }
+
+    // 分野別の正答率を表示
+    const statsDiv = document.createElement('div');
+    statsDiv.className = 'session-category-stats';
+
+    categoryResults.forEach(category => {
+        const isWeak = category.accuracy < 50;
+        const item = document.createElement('div');
+        item.className = `session-category-item${isWeak ? ' weak' : ''}`;
+        item.innerHTML = `
+            <div class="session-category-header">
+                <span class="session-category-name">${category.name}</span>
+                <span class="session-category-accuracy">${category.accuracy}%</span>
+            </div>
+            <div class="session-category-bar">
+                <div class="session-category-fill" style="width: ${category.accuracy}%"></div>
+            </div>
+            <div class="session-category-detail">
+                ${category.correct}/${category.total}問正解
+                ${isWeak ? '<span class="weak-badge">要復習</span>' : ''}
+            </div>
+        `;
+        statsDiv.appendChild(item);
+    });
+
+    container.appendChild(statsDiv);
+}
+
+// 模擬試験結果表示
+function showMockExamResult() {
+    const mockExamResultEl = document.getElementById('mock-exam-result');
+    const passFailBadge = document.getElementById('pass-fail-badge');
+    const passFailText = document.getElementById('pass-fail-text');
+    const timeInfoEl = document.getElementById('mock-exam-time-info');
+
+    const total = currentQuiz.length;
+    const rate = Math.round((correctCount / total) * 100);
+    const passed = rate >= PASS_RATE;
+
+    // 経過時間を計算
+    const endTime = new Date();
+    const elapsedMs = endTime - mockExamStartTime;
+    const elapsedMinutes = Math.floor(elapsedMs / 60000);
+    const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
+
+    // 制限時間
+    const config = MOCK_EXAM_CONFIG[mockExamType];
+    const timeLimitMinutes = config.timeLimit / 60;
+
+    // 合否表示
+    mockExamResultEl.classList.remove('hidden');
+    passFailBadge.className = 'pass-fail-badge ' + (passed ? 'passed' : 'failed');
+    passFailText.textContent = passed ? '合格' : '不合格';
+
+    // 時間情報
+    const remainingMinutes = Math.floor(timeRemaining / 60);
+    const remainingSeconds = timeRemaining % 60;
+    timeInfoEl.innerHTML = `
+        <strong>${config.name}</strong><br>
+        経過時間: ${elapsedMinutes}分${elapsedSeconds}秒<br>
+        残り時間: ${remainingMinutes}分${remainingSeconds}秒<br>
+        制限時間: ${Math.floor(timeLimitMinutes / 60)}時間${timeLimitMinutes % 60}分
+    `;
+}
+
+// 模擬試験開始
+function startMockExam(type) {
+    const config = MOCK_EXAM_CONFIG[type];
+
+    if (!confirm(`${config.name}の模擬試験を開始します。\n\n` +
+        `問題数: ${config.questionCount}問\n` +
+        `制限時間: ${Math.floor(config.timeLimit / 3600)}時間${(config.timeLimit % 3600) / 60}分\n` +
+        `合格ライン: ${PASS_RATE}%以上\n\n` +
+        `開始しますか？`)) {
+        return;
+    }
+
+    isMockExamMode = true;
+    mockExamType = type;
+    mockExamStartTime = new Date();
+    quizMode = type;
+    currentIndex = 0;
+    correctCount = 0;
+    userAnswers = [];
+    isTimerMode = true;
+
+    // 問題をフィルタリング（午後は45-50と61-72）
+    if (type === 'am') {
+        currentQuiz = quizData.filter(q => q.id >= config.startQuestion && q.id <= config.endQuestion);
+    } else {
+        currentQuiz = quizData.filter(q => (q.id >= 45 && q.id <= 50) || (q.id >= 61 && q.id <= 72));
+    }
+
+    if (currentQuiz.length === 0) {
+        alert('該当する問題がありません');
+        isMockExamMode = false;
+        return;
+    }
+
+    document.getElementById('total-num').textContent = currentQuiz.length;
+
+    // タイマー設定
+    timeRemaining = config.timeLimit;
+    document.getElementById('timer-display').classList.remove('hidden');
+    startTimer();
+
+    showScreen('quiz-screen');
+    displayQuestion();
 }
 
 // 解答確認
@@ -748,6 +966,8 @@ function goHome() {
         clearInterval(timerInterval);
         timerInterval = null;
     }
+    isMockExamMode = false;
+    mockExamType = null;
     showScreen('start-screen');
     window.scrollTo(0, 0);
 }
