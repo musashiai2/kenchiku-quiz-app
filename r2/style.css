@@ -2082,3 +2082,16 @@ body.dark-mode .history-rate.fail {
         padding: 12px;
     }
 }
+
+/* 印刷用問題集セクション */
+.print-section {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 24px;
+    margin-top: 20px;
+    box-shadow: var(--shadow);
+}
+.print-section h3 { text-align: center; margin-bottom: 8px; color: var(--text-color); }
+.print-description { text-align: center; font-size: 0.85rem; color: var(--text-light); margin-bottom: 16px; }
+.btn-print { background: linear-gradient(135deg, #059669, #10b981); color: white; }
+.btn-print:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }

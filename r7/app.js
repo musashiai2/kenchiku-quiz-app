@@ -1597,3 +1597,26 @@ showResult = function() {
     }
 })();
 
+// =====================
+// 印刷用問題集生成
+// =====================
+function generatePrintableQuiz() {
+    const questions = quizData;
+    if (!questions || questions.length === 0) { alert('問題データがありません'); return; }
+    let html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>1級建築施工管理技術検定 令和7年度 問題集</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif;font-size:11pt;line-height:1.6;padding:20mm}.header{text-align:center;margin-bottom:20px;padding-bottom:15px;border-bottom:2px solid #333}.header h1{font-size:16pt;margin-bottom:5px}.header p{font-size:10pt;color:#666}.question{margin-bottom:20px;page-break-inside:avoid}.question-header{font-weight:bold;margin-bottom:8px;padding:5px 10px;background:#f0f0f0;border-left:4px solid #2563eb}.question-text{margin-bottom:10px;padding-left:10px}.choices{padding-left:20px}.choice{margin-bottom:5px;display:flex}.choice-num{min-width:25px;font-weight:bold}.answer-section{margin-top:40px;page-break-before:always}.answer-section h2{font-size:14pt;margin-bottom:15px;padding-bottom:10px;border-bottom:2px solid #333}.answer-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.answer-item{padding:5px 10px;background:#f9f9f9;border:1px solid #ddd;text-align:center;font-size:10pt}@media print{body{padding:15mm}.question{page-break-inside:avoid}}</style></head><body><div class="header"><h1>1級建築施工管理技術検定 学科試験</h1><p>令和7年度 問題集（全${questions.length}問）</p></div>`;
+    questions.forEach((q, index) => {
+        html += `<div class="question"><div class="question-header">問題 ${q.id}</div><div class="question-text">${escapeHtml(q.question)}</div><div class="choices">`;
+        q.choices.forEach((choice, i) => { html += `<div class="choice"><span class="choice-num">${i+1}.</span><span>${escapeHtml(choice)}</span></div>`; });
+        html += `</div></div>`;
+        if ((index + 1) % 4 === 0 && index < questions.length - 1) html += `<div style="page-break-after:always;"></div>`;
+    });
+    html += `<div class="answer-section"><h2>解答一覧</h2><div class="answer-grid">`;
+    questions.forEach(q => { html += `<div class="answer-item">問${q.id}: ${q.correct}</div>`; });
+    html += `</div></div></body></html>`;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = function() { printWindow.print(); };
+}
+function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+

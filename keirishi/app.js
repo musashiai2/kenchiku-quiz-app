@@ -1668,6 +1668,284 @@ function updateCountdownDisplay(dateStr) {
     }
 }
 
+// =====================
+// 印刷用問題集生成
+// =====================
+
+function generatePrintableQuiz() {
+    // 選択した分野の問題を取得（未選択なら全問題）
+    let questions = [...quizData];
+    if (selectedSession !== null) {
+        questions = questions.filter(q => q.type === selectedSession);
+    }
+
+    if (questions.length === 0) {
+        alert('問題がありません');
+        return;
+    }
+
+    // 印刷用HTMLを生成
+    const printWindow = window.open('', '_blank');
+    const title = document.querySelector('#start-screen .header h1').textContent;
+    const subtitle = document.querySelector('#start-screen .header h2').textContent;
+    const category = selectedSession ? selectedSession : '全問題';
+
+    let printHTML = `
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>${title} - 印刷用問題集</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #000;
+            background: #fff;
+        }
+        .print-header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 2px solid #333;
+            margin-bottom: 20px;
+        }
+        .print-header h1 {
+            font-size: 18pt;
+            margin-bottom: 5px;
+        }
+        .print-header h2 {
+            font-size: 14pt;
+            font-weight: normal;
+            color: #555;
+        }
+        .print-header .category {
+            font-size: 12pt;
+            margin-top: 10px;
+            color: #333;
+        }
+        .print-header .date {
+            font-size: 10pt;
+            color: #666;
+            margin-top: 5px;
+        }
+        .question-block {
+            margin-bottom: 24px;
+            page-break-inside: avoid;
+        }
+        .question-number {
+            font-weight: bold;
+            font-size: 12pt;
+            margin-bottom: 8px;
+            padding: 4px 8px;
+            background: #f0f0f0;
+            display: inline-block;
+        }
+        .question-type {
+            font-size: 10pt;
+            color: #666;
+            margin-left: 10px;
+        }
+        .question-text {
+            margin: 10px 0;
+            padding-left: 10px;
+            white-space: pre-wrap;
+        }
+        .choices {
+            margin-left: 20px;
+        }
+        .choice {
+            margin: 8px 0;
+            padding-left: 10px;
+        }
+        .choice-number {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            line-height: 24px;
+            text-align: center;
+            border: 1px solid #333;
+            border-radius: 50%;
+            margin-right: 8px;
+            font-weight: bold;
+        }
+        .answer-space {
+            margin-top: 10px;
+            padding: 5px 10px;
+            border: 1px dashed #999;
+            background: #fafafa;
+            font-size: 10pt;
+            color: #666;
+        }
+        .page-break {
+            page-break-after: always;
+        }
+        .answer-section {
+            margin-top: 40px;
+            border-top: 2px solid #333;
+            padding-top: 20px;
+        }
+        .answer-section h2 {
+            font-size: 16pt;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .answer-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        .answer-item {
+            padding: 8px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        .answer-item .q-num {
+            font-weight: bold;
+        }
+        .answer-item .ans {
+            color: #d00;
+            font-weight: bold;
+            font-size: 14pt;
+        }
+        @media print {
+            body {
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+        .print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14pt;
+            cursor: pointer;
+        }
+        .print-btn:hover {
+            background: #1d4ed8;
+        }
+    </style>
+</head>
+<body>
+    <button class="print-btn no-print" onclick="window.print()">印刷する</button>
+
+    <div class="print-header">
+        <h1>${title}</h1>
+        <h2>${subtitle}</h2>
+        <p class="category">分野: ${category}（${questions.length}問）</p>
+        <p class="date">出力日: ${new Date().toLocaleDateString('ja-JP')}</p>
+    </div>
+`;
+
+    // 問題を出力
+    questions.forEach((q, index) => {
+        const questionNum = q.questionNo || q.id;
+        const questionType = q.type || '';
+
+        // 選択肢を抽出
+        let questionBody = q.question;
+        let choices = [];
+
+        // 選択肢パターンを検出
+        const choicePattern = /\n[1-4]\.\s/;
+        if (choicePattern.test(q.question)) {
+            const firstChoiceMatch = q.question.match(/\n1\.\s/);
+            if (firstChoiceMatch) {
+                const firstChoiceIndex = q.question.indexOf(firstChoiceMatch[0]);
+                questionBody = q.question.substring(0, firstChoiceIndex).trim();
+                const choicesText = q.question.substring(firstChoiceIndex);
+                const parts = choicesText.split(/\n[1-4]\.\s+/).filter(s => s.trim());
+                parts.forEach((text, i) => {
+                    if (text.trim()) {
+                        choices.push({ number: i + 1, text: text.trim() });
+                    }
+                });
+            }
+        }
+
+        printHTML += `
+    <div class="question-block">
+        <div class="question-number">問 ${questionNum} <span class="question-type">${questionType}</span></div>
+        <div class="question-text">${escapeHtml(questionBody)}</div>
+`;
+
+        if (choices.length > 0) {
+            printHTML += `        <div class="choices">`;
+            choices.forEach(choice => {
+                printHTML += `
+            <div class="choice">
+                <span class="choice-number">${choice.number}</span>
+                ${escapeHtml(choice.text)}
+            </div>`;
+            });
+            printHTML += `
+        </div>`;
+        }
+
+        printHTML += `
+        <div class="answer-space">解答欄: [    ]</div>
+    </div>
+`;
+
+        // 3-4問ごとに改ページ（ただし最後は除く）
+        if ((index + 1) % 4 === 0 && index < questions.length - 1) {
+            printHTML += `    <div class="page-break"></div>\n`;
+        }
+    });
+
+    // 解答一覧
+    printHTML += `
+    <div class="page-break"></div>
+    <div class="answer-section">
+        <h2>解答一覧</h2>
+        <div class="answer-grid">
+`;
+
+    questions.forEach(q => {
+        const questionNum = q.questionNo || q.id;
+        const correctAnswer = extractCorrectAnswer(q.answer);
+        printHTML += `            <div class="answer-item">
+                <span class="q-num">問${questionNum}</span>
+                <span class="ans">${correctAnswer !== null ? correctAnswer : '-'}</span>
+            </div>
+`;
+    });
+
+    printHTML += `        </div>
+    </div>
+</body>
+</html>`;
+
+    printWindow.document.write(printHTML);
+    printWindow.document.close();
+}
+
+// HTMLエスケープ関数
+function escapeHtml(text) {
+    if (!text) return '';
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/\n/g, '<br>');
+}
+
 // キーボードショートカット
 document.addEventListener('keydown', (e) => {
     const quizScreen = document.getElementById('quiz-screen');
