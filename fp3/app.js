@@ -8,6 +8,7 @@ let timerInterval = null;
 let timeRemaining = 0;
 let isTimerMode = false;
 let selectedSession = null;
+let selectedYear = null;  // 年度フィルタ
 let isWrongReviewMode = false;  // 復習モードフラグ
 let wrongAnswersData = {};      // 復習時の間違い履歴データ
 let quizStartTime = null;       // 学習開始時間
@@ -21,6 +22,19 @@ const STORAGE_BASE_KEYS = {
     categoryStats: 'category_stats_fp3',
     adaptiveLearning: 'adaptive_fp3',
     studyTime: 'quiz_study_time_fp3'
+};
+
+const SESSION_LABELS = {
+    1: '2025年5月（CBT）',
+    2: '2024年5月（CBT）',
+    3: '2024年1月',
+    4: '2023年9月',
+    5: '2023年5月',
+    6: '2023年1月',
+    7: '2022年9月',
+    8: '2022年5月',
+    9: '2022年1月',
+    10: '2021年9月'
 };
 
 // 適応型学習の設定
@@ -58,6 +72,7 @@ function initializeApp() {
     updateStatsDisplay();
     updateWrongCountDisplay();
     updateBookmarkCountDisplay();
+    generateYearButtons();
     generateSessionButtons();
     updateCategoryStatsDisplay();
     initExamCountdown();
@@ -577,6 +592,40 @@ function updateBookmarkButton(questionId) {
 // セッション（分野）選択
 // =====================
 
+function generateYearButtons() {
+    const container = document.getElementById('year-buttons');
+    if (!container) return;
+
+    const sessions = [...new Set(quizData.map(q => q.session))].sort((a, b) => a - b);
+    container.innerHTML = '';
+
+    const allBtn = document.createElement('button');
+    allBtn.className = 'session-btn active';
+    allBtn.textContent = '全て';
+    allBtn.onclick = () => selectYear(null);
+    container.appendChild(allBtn);
+
+    sessions.forEach(session => {
+        const btn = document.createElement('button');
+        btn.className = 'session-btn';
+        btn.textContent = SESSION_LABELS[session] || ('第' + session + '回');
+        btn.dataset.session = session;
+        btn.onclick = () => selectYear(session);
+        container.appendChild(btn);
+    });
+}
+
+function selectYear(session) {
+    selectedYear = session;
+    document.querySelectorAll('#year-buttons .session-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if ((session === null && btn.textContent === '全て') ||
+            (session !== null && parseInt(btn.dataset.session) === session)) {
+            btn.classList.add('active');
+        }
+    });
+}
+
 function generateSessionButtons() {
     const container = document.getElementById('session-buttons');
     if (!container) return;
@@ -623,6 +672,10 @@ function startQuiz(mode, withTimer = false) {
     quizStartTime = Date.now();  // 学習開始時間を記録
 
     let questions = [...quizData];
+
+    if (selectedYear !== null) {
+        questions = questions.filter(q => q.session === selectedYear);
+    }
 
     if (selectedSession !== null) {
         questions = questions.filter(q => q.type === selectedSession);
