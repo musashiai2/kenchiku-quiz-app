@@ -1,0 +1,1974 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第二次検定 記述式問題 学習ツール</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #7c3aed;
+            --accent-color: #8b5cf6;
+            --secondary-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --text-light: #64748b;
+            --border-color: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        body.dark-mode {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f1f5f9;
+            --text-light: #94a3b8;
+            --border-color: #334155;
+        }
+
+        body {
+            font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        body.dark-mode {
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        /* Dark mode button */
+        .dark-mode-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: var(--card-bg);
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            font-size: 1.2rem;
+            z-index: 1000;
+            transition: all 0.2s ease;
+        }
+
+        .dark-mode-btn:hover {
+            transform: scale(1.1);
+        }
+
+        /* Back link */
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        body.dark-mode .back-link {
+            color: var(--text-light);
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 20px 24px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+
+        .header h1 {
+            font-size: 1.3rem;
+            color: var(--primary-color);
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            color: var(--text-light);
+            font-size: 0.85rem;
+        }
+
+        /* Filters */
+        .filters-section {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+
+        .filter-group {
+            margin-bottom: 12px;
+        }
+
+        .filter-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .filter-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-light);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .filter-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .filter-chip {
+            display: none;
+        }
+
+        .filter-chip-label {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: 2px solid var(--border-color);
+            background: var(--bg-color);
+            color: var(--text-light);
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .filter-chip:checked + .filter-chip-label {
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .filter-chip-label:hover {
+            border-color: var(--accent-color);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: var(--card-bg);
+            border-radius: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 14px 8px;
+            border: none;
+            background: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-light);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            font-family: inherit;
+        }
+
+        .tab-btn::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+            border-radius: 3px 3px 0 0;
+            transition: width 0.3s ease;
+        }
+
+        .tab-btn.active {
+            color: var(--primary-color);
+        }
+
+        .tab-btn.active::after {
+            width: 60%;
+        }
+
+        .tab-btn:hover {
+            background: var(--bg-color);
+        }
+
+        .tab-icon {
+            display: block;
+            font-size: 1.3rem;
+            margin-bottom: 4px;
+        }
+
+        /* Tab content */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Card base */
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            margin-bottom: 16px;
+        }
+
+        /* ========== Flash Card ========== */
+        .flashcard-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .flashcard-counter {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-color);
+            background: var(--bg-color);
+            padding: 6px 14px;
+            border-radius: 20px;
+        }
+
+        .flashcard-btn-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, var(--warning-color), #d97706);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--secondary-color), #059669);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger-color), #dc2626);
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Flip card */
+        .flip-card-container {
+            perspective: 1000px;
+            margin-bottom: 16px;
+        }
+
+        .flip-card {
+            position: relative;
+            width: 100%;
+            min-height: 280px;
+            transition: transform 0.6s ease;
+            transform-style: preserve-3d;
+            cursor: pointer;
+        }
+
+        .flip-card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .flip-card-front,
+        .flip-card-back {
+            position: absolute;
+            width: 100%;
+            min-height: 280px;
+            backface-visibility: hidden;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+        }
+
+        .flip-card-front {
+            background: var(--card-bg);
+            border-top: 4px solid var(--primary-color);
+        }
+
+        .flip-card-back {
+            background: var(--card-bg);
+            border-top: 4px solid var(--secondary-color);
+            transform: rotateY(180deg);
+        }
+
+        .flip-hint {
+            text-align: center;
+            color: var(--text-light);
+            font-size: 0.8rem;
+            margin-top: 16px;
+        }
+
+        .card-meta {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .card-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .card-badge.year {
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            color: white;
+        }
+
+        .card-badge.category {
+            background: linear-gradient(135deg, var(--secondary-color), #059669);
+            color: white;
+        }
+
+        .card-badge.answer-label {
+            background: linear-gradient(135deg, var(--warning-color), #d97706);
+            color: white;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 12px;
+        }
+
+        .card-question-text {
+            font-size: 0.9rem;
+            line-height: 1.8;
+            color: var(--text-color);
+            white-space: pre-wrap;
+        }
+
+        .card-answer-text {
+            font-size: 0.9rem;
+            line-height: 1.8;
+            color: var(--text-color);
+            white-space: pre-wrap;
+        }
+
+        .sub-question {
+            background: var(--bg-color);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .sub-question-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 6px;
+        }
+
+        .sub-answer {
+            background: var(--bg-color);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+            border-left: 3px solid var(--secondary-color);
+        }
+
+        .sub-answer-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--secondary-color);
+            margin-bottom: 6px;
+        }
+
+        .bookmark-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .bookmark-btn.bookmarked {
+            background: linear-gradient(135deg, var(--warning-color), #d97706);
+            color: white;
+        }
+
+        /* Navigation buttons */
+        .nav-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        /* ========== Voice Section ========== */
+        .voice-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            margin-bottom: 16px;
+        }
+
+        .voice-question-display {
+            background: var(--bg-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .voice-text-highlight {
+            background: rgba(139, 92, 246, 0.2);
+            border-radius: 4px;
+            padding: 1px 2px;
+        }
+
+        body.dark-mode .voice-text-highlight {
+            background: rgba(139, 92, 246, 0.4);
+        }
+
+        .voice-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .voice-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .voice-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .voice-btn.play {
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            color: white;
+            width: 56px;
+            height: 56px;
+            font-size: 1.4rem;
+        }
+
+        .voice-btn.pause {
+            background: linear-gradient(135deg, var(--warning-color), #d97706);
+            color: white;
+        }
+
+        .voice-btn.stop {
+            background: linear-gradient(135deg, var(--danger-color), #dc2626);
+            color: white;
+        }
+
+        .voice-settings {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            padding: 12px;
+            background: var(--bg-color);
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        .voice-setting-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-color);
+        }
+
+        .voice-setting-item input[type="range"] {
+            width: 100px;
+            accent-color: var(--primary-color);
+        }
+
+        .speed-value {
+            font-weight: 600;
+            min-width: 35px;
+            text-align: center;
+            color: var(--primary-color);
+        }
+
+        .auto-play-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            color: var(--text-color);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: var(--border-color);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .toggle-switch.active {
+            background: var(--primary-color);
+        }
+
+        .toggle-switch.active::after {
+            left: 22px;
+        }
+
+        .voice-status {
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-light);
+            padding: 8px;
+        }
+
+        .voice-nav {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        /* ========== Review Section ========== */
+        .review-question-display {
+            background: var(--bg-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .review-sub-question-select {
+            margin-bottom: 16px;
+        }
+
+        .review-sub-question-select label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-light);
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .review-sub-question-select select {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 2px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-color);
+            font-size: 0.9rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .review-sub-question-select select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .answer-textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 14px;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.8;
+            font-family: inherit;
+            color: var(--text-color);
+            background: var(--card-bg);
+            resize: vertical;
+            transition: border-color 0.2s;
+            margin-bottom: 12px;
+        }
+
+        .answer-textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .answer-textarea::placeholder {
+            color: var(--text-light);
+        }
+
+        .review-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        /* Score display */
+        .score-display {
+            background: var(--bg-color);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .score-circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 12px;
+        }
+
+        .score-circle.high {
+            background: linear-gradient(135deg, var(--secondary-color), #059669);
+        }
+
+        .score-circle.medium {
+            background: linear-gradient(135deg, var(--warning-color), #d97706);
+        }
+
+        .score-circle.low {
+            background: linear-gradient(135deg, var(--danger-color), #dc2626);
+        }
+
+        .score-label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        /* Keywords */
+        .keywords-section {
+            margin-bottom: 16px;
+        }
+
+        .keywords-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-color);
+            margin-bottom: 10px;
+        }
+
+        .keyword-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .keyword-tag {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .keyword-tag.found {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--secondary-color);
+            border: 1px solid var(--secondary-color);
+        }
+
+        .keyword-tag.missing {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+        }
+
+        /* Comparison */
+        .comparison-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .comparison-col {
+            background: var(--bg-color);
+            border-radius: 12px;
+            padding: 14px;
+        }
+
+        .comparison-col h4 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .comparison-col.user-answer h4 {
+            color: var(--primary-color);
+        }
+
+        .comparison-col.model-answer h4 {
+            color: var(--secondary-color);
+        }
+
+        .comparison-text {
+            font-size: 0.85rem;
+            line-height: 1.8;
+            color: var(--text-color);
+            white-space: pre-wrap;
+        }
+
+        /* Gemini AI */
+        .ai-section {
+            background: var(--bg-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .ai-section-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .ai-section-header h4 {
+            font-size: 0.9rem;
+            color: var(--primary-color);
+        }
+
+        .api-key-input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .api-key-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-family: inherit;
+            background: var(--card-bg);
+            color: var(--text-color);
+        }
+
+        .api-key-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .ai-result {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 14px;
+            font-size: 0.85rem;
+            line-height: 1.8;
+            color: var(--text-color);
+            white-space: pre-wrap;
+            border-left: 3px solid var(--accent-color);
+        }
+
+        .ai-loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-light);
+        }
+
+        .ai-loading .spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Review navigation */
+        .review-question-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .review-question-counter {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-light);
+        }
+
+        /* No questions message */
+        .no-questions {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+        }
+
+        .no-questions-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+        }
+
+        .no-questions-text {
+            font-size: 1rem;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85rem;
+        }
+
+        body.dark-mode .footer {
+            color: var(--text-light);
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .container {
+                padding: 12px;
+            }
+
+            .header h1 {
+                font-size: 1.1rem;
+            }
+
+            .tabs {
+                border-radius: 12px;
+            }
+
+            .tab-btn {
+                padding: 10px 4px;
+                font-size: 0.75rem;
+            }
+
+            .tab-icon {
+                font-size: 1.1rem;
+            }
+
+            .flashcard-controls {
+                justify-content: center;
+            }
+
+            .flip-card-front,
+            .flip-card-back {
+                padding: 16px;
+            }
+
+            .comparison-section {
+                grid-template-columns: 1fr;
+            }
+
+            .voice-controls {
+                gap: 8px;
+            }
+
+            .nav-buttons {
+                flex-direction: row;
+            }
+
+            .btn {
+                padding: 7px 12px;
+                font-size: 0.8rem;
+            }
+
+            .api-key-input-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="dark-mode-btn" onclick="toggleDarkMode()" title="ダークモード">&#127769;</button>
+
+    <div class="container">
+        <a href="../index.html" class="back-link">&#8592; メイン画面に戻る</a>
+
+        <div class="header">
+            <h1>&#128221; 第二次検定 記述式問題 学習ツール</h1>
+            <p>1級建築施工管理技士 - フラッシュカード / ボイス読み上げ / 回答添削</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters-section">
+            <div class="filter-group">
+                <span class="filter-label">&#128197; 年度フィルター</span>
+                <div class="filter-chips" id="year-filters"></div>
+            </div>
+            <div class="filter-group">
+                <span class="filter-label">&#128204; カテゴリフィルター</span>
+                <div class="filter-chips" id="category-filters"></div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="flashcard" onclick="switchTab('flashcard')">
+                <span class="tab-icon">&#127183;</span>
+                フラッシュカード
+            </button>
+            <button class="tab-btn" data-tab="voice" onclick="switchTab('voice')">
+                <span class="tab-icon">&#128266;</span>
+                ボイス読み上げ
+            </button>
+            <button class="tab-btn" data-tab="review" onclick="switchTab('review')">
+                <span class="tab-icon">&#9998;</span>
+                回答添削
+            </button>
+        </div>
+
+        <!-- ==================== -->
+        <!-- Tab 1: Flash Card   -->
+        <!-- ==================== -->
+        <div class="tab-content active" id="tab-flashcard">
+            <div class="card">
+                <div class="flashcard-controls">
+                    <span class="flashcard-counter" id="fc-counter">0 / 0</span>
+                    <div class="flashcard-btn-group">
+                        <button class="btn btn-secondary btn-sm" onclick="shuffleCards()">&#128256; シャッフル</button>
+                        <button class="btn btn-sm bookmark-btn" id="fc-bookmark-btn" onclick="toggleBookmark()">&#9734; ブックマーク</button>
+                    </div>
+                </div>
+
+                <div class="flip-card-container" id="fc-container">
+                    <div class="flip-card" id="flip-card" onclick="flipCard()">
+                        <div class="flip-card-front" id="fc-front">
+                            <div class="card-meta" id="fc-meta"></div>
+                            <div class="card-title" id="fc-title"></div>
+                            <div class="card-question-text" id="fc-question"></div>
+                            <div class="flip-hint">&#128070; タップで模範解答を表示</div>
+                        </div>
+                        <div class="flip-card-back" id="fc-back">
+                            <div class="card-meta">
+                                <span class="card-badge answer-label">&#9989; 模範解答</span>
+                            </div>
+                            <div class="card-answer-text" id="fc-answer"></div>
+                            <div class="flip-hint">&#128070; タップで問題に戻る</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="nav-buttons">
+                    <button class="btn btn-secondary" id="fc-prev" onclick="prevCard()">&#9664; 前へ</button>
+                    <button class="btn btn-primary" id="fc-next" onclick="nextCard()">次へ &#9654;</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== -->
+        <!-- Tab 2: Voice         -->
+        <!-- ==================== -->
+        <div class="tab-content" id="tab-voice">
+            <div class="voice-card">
+                <div class="flashcard-controls">
+                    <span class="flashcard-counter" id="voice-counter">0 / 0</span>
+                </div>
+
+                <div class="voice-question-display" id="voice-display">
+                    <div id="voice-text-content"></div>
+                </div>
+
+                <div class="voice-controls">
+                    <button class="voice-btn stop" onclick="voiceStop()" title="停止">&#9632;</button>
+                    <button class="voice-btn play" id="voice-play-btn" onclick="voicePlayPause()" title="再生">&#9654;</button>
+                    <button class="voice-btn pause" onclick="voicePause()" title="一時停止">&#10074;&#10074;</button>
+                </div>
+
+                <div class="voice-settings">
+                    <div class="voice-setting-item">
+                        <span>&#128034;</span>
+                        <input type="range" id="voice-speed" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateSpeedDisplay()">
+                        <span class="speed-value" id="speed-value">1.0x</span>
+                        <span>&#128007;</span>
+                    </div>
+                    <label class="auto-play-toggle" onclick="toggleAutoPlay()">
+                        <div class="toggle-switch" id="auto-play-toggle"></div>
+                        <span>自動再生</span>
+                    </label>
+                </div>
+
+                <div class="voice-status" id="voice-status">再生ボタンを押して読み上げを開始</div>
+
+                <div class="voice-nav">
+                    <button class="btn btn-secondary" onclick="voicePrevQuestion()">&#9664; 前へ</button>
+                    <button class="btn btn-primary" onclick="voiceNextQuestion()">次へ &#9654;</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== -->
+        <!-- Tab 3: Review        -->
+        <!-- ==================== -->
+        <div class="tab-content" id="tab-review">
+            <div class="card">
+                <div class="review-question-nav">
+                    <button class="btn btn-secondary btn-sm" onclick="reviewPrev()">&#9664; 前へ</button>
+                    <span class="review-question-counter" id="review-counter">0 / 0</span>
+                    <button class="btn btn-primary btn-sm" onclick="reviewNext()">次へ &#9654;</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-meta" id="review-meta"></div>
+                <div class="card-title" id="review-title"></div>
+                <div class="review-question-display" id="review-question"></div>
+
+                <div class="review-sub-question-select" id="review-sub-select-container">
+                    <label for="review-sub-select">小問を選択:</label>
+                    <select id="review-sub-select" onchange="onReviewSubQuestionChange()"></select>
+                </div>
+
+                <div id="review-selected-sub-question" style="margin-bottom: 12px;"></div>
+
+                <textarea class="answer-textarea" id="review-answer" placeholder="ここに回答を入力してください..."></textarea>
+
+                <div class="review-actions">
+                    <button class="btn btn-primary" onclick="doReview()">&#128270; 添削する</button>
+                    <button class="btn btn-secondary" onclick="showModelAnswer()">&#128214; 模範解答を見る</button>
+                    <button class="btn btn-warning" id="ai-review-btn" onclick="doAIReview()" style="display:none;">&#129302; AI添削</button>
+                </div>
+
+                <!-- Review results -->
+                <div id="review-results" style="display:none;">
+                    <div class="score-display" id="review-score"></div>
+
+                    <div class="keywords-section" id="review-keywords"></div>
+
+                    <div class="comparison-section" id="review-comparison" style="display:none;"></div>
+                </div>
+
+                <!-- AI Section -->
+                <div class="ai-section">
+                    <div class="ai-section-header" onclick="toggleAISection()">
+                        <span>&#129302;</span>
+                        <h4>Gemini AI 添削（オプション）</h4>
+                        <span id="ai-toggle-icon" style="margin-left:auto; color:var(--text-light);">&#9660;</span>
+                    </div>
+                    <div id="ai-section-content" style="display:none;">
+                        <p style="font-size:0.8rem; color:var(--text-light); margin-bottom:10px;">
+                            Gemini API キーを入力すると、AIによる詳細な添削を受けられます（Gemini 2.0 Flash 無料枠）
+                        </p>
+                        <div class="api-key-input-group">
+                            <input type="password" class="api-key-input" id="gemini-api-key" placeholder="Gemini API Key を入力...">
+                            <button class="btn btn-primary btn-sm" onclick="saveApiKey()">保存</button>
+                            <button class="btn btn-secondary btn-sm" onclick="clearApiKey()">削除</button>
+                        </div>
+                        <div id="ai-result-container" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>1級建築施工管理技士 第二次検定 記述式問題 学習ツール</p>
+        </div>
+    </div>
+
+    <script src="essay-questions.js"></script>
+    <script>
+        // =====================
+        // State
+        // =====================
+        let filteredQuestions = [];
+        let fcIndex = 0;
+        let voiceIndex = 0;
+        let reviewIndex = 0;
+        let bookmarks = JSON.parse(localStorage.getItem('essay_bookmarks') || '[]');
+        let autoPlay = false;
+        let isSpeaking = false;
+        let isPaused = false;
+        let currentUtterance = null;
+        let voiceTextSegments = [];
+        let currentSegmentIndex = 0;
+
+        const YEAR_OPTIONS = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7'];
+        const CATEGORY_OPTIONS = ['経験記述', '仮設計画', '安全管理', '工程管理', '施工留意事項'];
+
+        let selectedYears = [...YEAR_OPTIONS];
+        let selectedCategories = [...CATEGORY_OPTIONS];
+
+        // =====================
+        // Init
+        // =====================
+        document.addEventListener('DOMContentLoaded', () => {
+            initDarkMode();
+            initFilters();
+            loadApiKey();
+            applyFilters();
+        });
+
+        // =====================
+        // Dark Mode
+        // =====================
+        function initDarkMode() {
+            const isDark = localStorage.getItem('essay_dark_mode') === 'true';
+            if (isDark) {
+                document.body.classList.add('dark-mode');
+            }
+            updateDarkModeButton();
+        }
+
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('essay_dark_mode', isDark);
+            updateDarkModeButton();
+        }
+
+        function updateDarkModeButton() {
+            const btn = document.querySelector('.dark-mode-btn');
+            const isDark = document.body.classList.contains('dark-mode');
+            btn.innerHTML = isDark ? '&#9728;&#65039;' : '&#127769;';
+            btn.title = isDark ? 'ライトモード' : 'ダークモード';
+        }
+
+        // =====================
+        // Filters
+        // =====================
+        function initFilters() {
+            const yearContainer = document.getElementById('year-filters');
+            YEAR_OPTIONS.forEach(year => {
+                const id = 'filter-year-' + year;
+                yearContainer.innerHTML += `
+                    <input type="checkbox" class="filter-chip" id="${id}" checked onchange="onYearFilterChange()">
+                    <label class="filter-chip-label" for="${id}">${year}</label>
+                `;
+            });
+
+            const catContainer = document.getElementById('category-filters');
+            CATEGORY_OPTIONS.forEach(cat => {
+                const id = 'filter-cat-' + cat;
+                catContainer.innerHTML += `
+                    <input type="checkbox" class="filter-chip" id="${id}" checked onchange="onCategoryFilterChange()">
+                    <label class="filter-chip-label" for="${id}">${cat}</label>
+                `;
+            });
+        }
+
+        function onYearFilterChange() {
+            selectedYears = YEAR_OPTIONS.filter(y => document.getElementById('filter-year-' + y).checked);
+            applyFilters();
+        }
+
+        function onCategoryFilterChange() {
+            selectedCategories = CATEGORY_OPTIONS.filter(c => document.getElementById('filter-cat-' + c).checked);
+            applyFilters();
+        }
+
+        function applyFilters() {
+            if (typeof essayQuestions === 'undefined') {
+                filteredQuestions = [];
+            } else {
+                filteredQuestions = essayQuestions.filter(q => {
+                    const yearMatch = selectedYears.includes(q.yearShort);
+                    const catMatch = selectedCategories.includes(q.category);
+                    return yearMatch && catMatch;
+                });
+            }
+            fcIndex = 0;
+            voiceIndex = 0;
+            reviewIndex = 0;
+            updateFlashcard();
+            updateVoiceDisplay();
+            updateReviewDisplay();
+        }
+
+        // =====================
+        // Tabs
+        // =====================
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            document.getElementById('tab-' + tabName).classList.add('active');
+
+            // Stop voice if switching away
+            if (tabName !== 'voice') {
+                voiceStop();
+            }
+        }
+
+        // =====================
+        // Flash Card
+        // =====================
+        function updateFlashcard() {
+            const counter = document.getElementById('fc-counter');
+            const flipCard = document.getElementById('flip-card');
+
+            if (filteredQuestions.length === 0) {
+                counter.textContent = '0 / 0';
+                document.getElementById('fc-meta').innerHTML = '';
+                document.getElementById('fc-title').textContent = '';
+                document.getElementById('fc-question').innerHTML = '<div class="no-questions"><div class="no-questions-icon">&#128221;</div><div class="no-questions-text">フィルターに一致する問題がありません</div></div>';
+                document.getElementById('fc-answer').textContent = '';
+                return;
+            }
+
+            const q = filteredQuestions[fcIndex];
+            counter.textContent = (fcIndex + 1) + ' / ' + filteredQuestions.length;
+
+            // Reset flip
+            flipCard.classList.remove('flipped');
+
+            // Front
+            document.getElementById('fc-meta').innerHTML = `
+                <span class="card-badge year">${q.yearShort}</span>
+                <span class="card-badge category">${q.category}</span>
+            `;
+            document.getElementById('fc-title').textContent = q.questionNumber + ' - ' + q.title;
+
+            let questionHtml = '<div style="margin-bottom:12px;">' + escapeHtml(q.question) + '</div>';
+            if (q.subQuestions && q.subQuestions.length > 0) {
+                q.subQuestions.forEach(sub => {
+                    questionHtml += `<div class="sub-question"><div class="sub-question-label">${escapeHtml(sub.id)}</div><div>${escapeHtml(sub.text)}</div></div>`;
+                });
+            }
+            document.getElementById('fc-question').innerHTML = questionHtml;
+
+            // Back
+            let answerHtml = '';
+            if (q.subQuestions && q.subQuestions.length > 0) {
+                q.subQuestions.forEach(sub => {
+                    answerHtml += `<div class="sub-answer"><div class="sub-answer-label">${escapeHtml(sub.id)} - 模範解答</div><div>${escapeHtml(sub.modelAnswer)}</div></div>`;
+                });
+            }
+            document.getElementById('fc-answer').innerHTML = answerHtml;
+
+            // Update flip card height
+            updateFlipCardHeight();
+
+            // Bookmark
+            updateBookmarkButton();
+        }
+
+        function updateFlipCardHeight() {
+            setTimeout(() => {
+                const front = document.getElementById('fc-front');
+                const back = document.getElementById('fc-back');
+                const card = document.getElementById('flip-card');
+                const frontH = front.scrollHeight;
+                const backH = back.scrollHeight;
+                const maxH = Math.max(frontH, backH, 280);
+                card.style.minHeight = maxH + 'px';
+                front.style.minHeight = maxH + 'px';
+                back.style.minHeight = maxH + 'px';
+            }, 50);
+        }
+
+        function flipCard() {
+            document.getElementById('flip-card').classList.toggle('flipped');
+        }
+
+        function nextCard() {
+            if (filteredQuestions.length === 0) return;
+            fcIndex = (fcIndex + 1) % filteredQuestions.length;
+            updateFlashcard();
+        }
+
+        function prevCard() {
+            if (filteredQuestions.length === 0) return;
+            fcIndex = (fcIndex - 1 + filteredQuestions.length) % filteredQuestions.length;
+            updateFlashcard();
+        }
+
+        function shuffleCards() {
+            if (filteredQuestions.length <= 1) return;
+            for (let i = filteredQuestions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [filteredQuestions[i], filteredQuestions[j]] = [filteredQuestions[j], filteredQuestions[i]];
+            }
+            fcIndex = 0;
+            updateFlashcard();
+        }
+
+        function toggleBookmark() {
+            if (filteredQuestions.length === 0) return;
+            const q = filteredQuestions[fcIndex];
+            const idx = bookmarks.indexOf(q.id);
+            if (idx >= 0) {
+                bookmarks.splice(idx, 1);
+            } else {
+                bookmarks.push(q.id);
+            }
+            localStorage.setItem('essay_bookmarks', JSON.stringify(bookmarks));
+            updateBookmarkButton();
+        }
+
+        function updateBookmarkButton() {
+            const btn = document.getElementById('fc-bookmark-btn');
+            if (filteredQuestions.length === 0) {
+                btn.className = 'btn btn-secondary btn-sm bookmark-btn';
+                btn.innerHTML = '&#9734; ブックマーク';
+                return;
+            }
+            const q = filteredQuestions[fcIndex];
+            const isBookmarked = bookmarks.includes(q.id);
+            if (isBookmarked) {
+                btn.className = 'btn btn-sm bookmark-btn bookmarked';
+                btn.innerHTML = '&#9733; ブックマーク済';
+            } else {
+                btn.className = 'btn btn-secondary btn-sm bookmark-btn';
+                btn.innerHTML = '&#9734; ブックマーク';
+            }
+        }
+
+        // =====================
+        // Voice
+        // =====================
+        function updateVoiceDisplay() {
+            const counter = document.getElementById('voice-counter');
+            const display = document.getElementById('voice-text-content');
+
+            if (filteredQuestions.length === 0) {
+                counter.textContent = '0 / 0';
+                display.innerHTML = '<div class="no-questions"><div class="no-questions-icon">&#128266;</div><div class="no-questions-text">フィルターに一致する問題がありません</div></div>';
+                return;
+            }
+
+            const q = filteredQuestions[voiceIndex];
+            counter.textContent = (voiceIndex + 1) + ' / ' + filteredQuestions.length;
+
+            // Build segments for speech and display
+            voiceTextSegments = [];
+            let displayHtml = '';
+
+            // Question header
+            displayHtml += `<div class="card-meta" style="margin-bottom:10px;"><span class="card-badge year">${q.yearShort}</span><span class="card-badge category">${q.category}</span></div>`;
+            displayHtml += `<div style="font-weight:700; color:var(--primary-color); margin-bottom:10px;">${escapeHtml(q.questionNumber)} - ${escapeHtml(q.title)}</div>`;
+
+            // Main question
+            const mainText = q.question;
+            const segId = voiceTextSegments.length;
+            voiceTextSegments.push({ type: 'question', text: mainText });
+            displayHtml += `<div id="voice-seg-${segId}" style="margin-bottom:12px; padding:8px; border-radius:8px; transition: background 0.3s;">${escapeHtml(mainText)}</div>`;
+
+            // Sub questions and answers
+            if (q.subQuestions && q.subQuestions.length > 0) {
+                q.subQuestions.forEach(sub => {
+                    // Sub question text
+                    const sqSegId = voiceTextSegments.length;
+                    voiceTextSegments.push({ type: 'sub-question', text: sub.id + '。 ' + sub.text });
+                    displayHtml += `<div id="voice-seg-${sqSegId}" class="sub-question" style="transition: background 0.3s;">${escapeHtml(sub.id)}: ${escapeHtml(sub.text)}</div>`;
+
+                    // Model answer
+                    const saSegId = voiceTextSegments.length;
+                    voiceTextSegments.push({ type: 'answer', text: '模範解答。 ' + sub.modelAnswer });
+                    displayHtml += `<div id="voice-seg-${saSegId}" class="sub-answer" style="transition: background 0.3s;"><div class="sub-answer-label">${escapeHtml(sub.id)} - 模範解答</div>${escapeHtml(sub.modelAnswer)}</div>`;
+                });
+            }
+
+            display.innerHTML = displayHtml;
+        }
+
+        function voicePlayPause() {
+            if (!('speechSynthesis' in window)) {
+                alert('お使いのブラウザは音声合成に対応していません。');
+                return;
+            }
+
+            if (filteredQuestions.length === 0) return;
+
+            if (isPaused) {
+                window.speechSynthesis.resume();
+                isPaused = false;
+                updateVoiceStatus('reading');
+                return;
+            }
+
+            if (isSpeaking) {
+                voicePause();
+                return;
+            }
+
+            currentSegmentIndex = 0;
+            speakNextSegment();
+        }
+
+        function speakNextSegment() {
+            if (currentSegmentIndex >= voiceTextSegments.length) {
+                isSpeaking = false;
+                updateVoiceStatus('finished');
+                clearHighlights();
+
+                if (autoPlay && filteredQuestions.length > 0) {
+                    voiceIndex = (voiceIndex + 1) % filteredQuestions.length;
+                    updateVoiceDisplay();
+                    setTimeout(() => {
+                        currentSegmentIndex = 0;
+                        speakNextSegment();
+                    }, 1000);
+                }
+                return;
+            }
+
+            const segment = voiceTextSegments[currentSegmentIndex];
+            const utterance = new SpeechSynthesisUtterance(segment.text);
+            utterance.lang = 'ja-JP';
+            utterance.rate = parseFloat(document.getElementById('voice-speed').value);
+
+            // Highlight current segment
+            clearHighlights();
+            const segEl = document.getElementById('voice-seg-' + currentSegmentIndex);
+            if (segEl) {
+                segEl.classList.add('voice-text-highlight');
+                segEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            utterance.onend = () => {
+                currentSegmentIndex++;
+                speakNextSegment();
+            };
+
+            utterance.onerror = (e) => {
+                if (e.error !== 'interrupted' && e.error !== 'canceled') {
+                    console.error('Speech error:', e);
+                }
+                isSpeaking = false;
+                updateVoiceStatus('stopped');
+                clearHighlights();
+            };
+
+            currentUtterance = utterance;
+            isSpeaking = true;
+            isPaused = false;
+            updateVoiceStatus('reading');
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function voicePause() {
+            if (isSpeaking && !isPaused) {
+                window.speechSynthesis.pause();
+                isPaused = true;
+                updateVoiceStatus('paused');
+            }
+        }
+
+        function voiceStop() {
+            window.speechSynthesis.cancel();
+            isSpeaking = false;
+            isPaused = false;
+            currentSegmentIndex = 0;
+            clearHighlights();
+            updateVoiceStatus('stopped');
+        }
+
+        function clearHighlights() {
+            document.querySelectorAll('.voice-text-highlight').forEach(el => {
+                el.classList.remove('voice-text-highlight');
+            });
+        }
+
+        function updateVoiceStatus(status) {
+            const el = document.getElementById('voice-status');
+            switch (status) {
+                case 'reading':
+                    el.textContent = '&#128266; 読み上げ中...';
+                    el.innerHTML = '&#128266; 読み上げ中...';
+                    break;
+                case 'paused':
+                    el.innerHTML = '&#9208; 一時停止中';
+                    break;
+                case 'stopped':
+                    el.innerHTML = '&#9632; 停止';
+                    break;
+                case 'finished':
+                    el.innerHTML = '&#9989; 読み上げ完了';
+                    break;
+                default:
+                    el.innerHTML = '再生ボタンを押して読み上げを開始';
+            }
+        }
+
+        function updateSpeedDisplay() {
+            const speed = parseFloat(document.getElementById('voice-speed').value);
+            document.getElementById('speed-value').textContent = speed.toFixed(1) + 'x';
+        }
+
+        function toggleAutoPlay() {
+            autoPlay = !autoPlay;
+            const toggle = document.getElementById('auto-play-toggle');
+            if (autoPlay) {
+                toggle.classList.add('active');
+            } else {
+                toggle.classList.remove('active');
+            }
+        }
+
+        function voiceNextQuestion() {
+            if (filteredQuestions.length === 0) return;
+            voiceStop();
+            voiceIndex = (voiceIndex + 1) % filteredQuestions.length;
+            updateVoiceDisplay();
+        }
+
+        function voicePrevQuestion() {
+            if (filteredQuestions.length === 0) return;
+            voiceStop();
+            voiceIndex = (voiceIndex - 1 + filteredQuestions.length) % filteredQuestions.length;
+            updateVoiceDisplay();
+        }
+
+        // =====================
+        // Review
+        // =====================
+        function updateReviewDisplay() {
+            const counter = document.getElementById('review-counter');
+            const resultsEl = document.getElementById('review-results');
+            resultsEl.style.display = 'none';
+            document.getElementById('review-answer').value = '';
+
+            if (filteredQuestions.length === 0) {
+                counter.textContent = '0 / 0';
+                document.getElementById('review-meta').innerHTML = '';
+                document.getElementById('review-title').textContent = '';
+                document.getElementById('review-question').innerHTML = '<div class="no-questions"><div class="no-questions-icon">&#9998;</div><div class="no-questions-text">フィルターに一致する問題がありません</div></div>';
+                document.getElementById('review-sub-select-container').style.display = 'none';
+                document.getElementById('review-selected-sub-question').innerHTML = '';
+                return;
+            }
+
+            const q = filteredQuestions[reviewIndex];
+            counter.textContent = (reviewIndex + 1) + ' / ' + filteredQuestions.length;
+
+            document.getElementById('review-meta').innerHTML = `
+                <span class="card-badge year">${q.yearShort}</span>
+                <span class="card-badge category">${q.category}</span>
+            `;
+            document.getElementById('review-title').textContent = q.questionNumber + ' - ' + q.title;
+            document.getElementById('review-question').innerHTML = escapeHtml(q.question);
+
+            // Sub question select
+            if (q.subQuestions && q.subQuestions.length > 0) {
+                document.getElementById('review-sub-select-container').style.display = 'block';
+                const select = document.getElementById('review-sub-select');
+                select.innerHTML = q.subQuestions.map((sub, i) =>
+                    `<option value="${i}">${sub.id}: ${sub.text.substring(0, 50)}${sub.text.length > 50 ? '...' : ''}</option>`
+                ).join('');
+                onReviewSubQuestionChange();
+            } else {
+                document.getElementById('review-sub-select-container').style.display = 'none';
+                document.getElementById('review-selected-sub-question').innerHTML = '';
+            }
+
+            // Update AI review button
+            updateAIReviewButton();
+
+            // Hide AI result
+            const aiContainer = document.getElementById('ai-result-container');
+            if (aiContainer) aiContainer.style.display = 'none';
+        }
+
+        function onReviewSubQuestionChange() {
+            const q = filteredQuestions[reviewIndex];
+            if (!q || !q.subQuestions || q.subQuestions.length === 0) return;
+            const idx = parseInt(document.getElementById('review-sub-select').value);
+            const sub = q.subQuestions[idx];
+            document.getElementById('review-selected-sub-question').innerHTML = `
+                <div class="sub-question">
+                    <div class="sub-question-label">${escapeHtml(sub.id)}</div>
+                    <div>${escapeHtml(sub.text)}</div>
+                </div>
+            `;
+        }
+
+        function reviewNext() {
+            if (filteredQuestions.length === 0) return;
+            reviewIndex = (reviewIndex + 1) % filteredQuestions.length;
+            updateReviewDisplay();
+        }
+
+        function reviewPrev() {
+            if (filteredQuestions.length === 0) return;
+            reviewIndex = (reviewIndex - 1 + filteredQuestions.length) % filteredQuestions.length;
+            updateReviewDisplay();
+        }
+
+        // =====================
+        // Review Logic
+        // =====================
+        function extractKeywords(text) {
+            // Remove common particles and markers, extract meaningful words
+            const cleanText = text.replace(/[\n\r]/g, ' ').replace(/[、。,.\(\)（）「」『』【】]/g, ' ');
+            const words = cleanText.split(/\s+/).filter(w => w.length >= 2);
+
+            // Deduplicate and filter out very common words
+            const stopWords = ['する', 'した', 'して', 'ある', 'いる', 'ない', 'なる', 'こと', 'もの', 'ため', 'よう', 'ところ', 'について', 'における', 'および', 'また', 'ただし', 'なお', 'それ', 'これ', 'その', 'この', 'ただ', 'さらに', 'おいて', 'あり', 'あった', 'ので', 'から', 'まで', 'として', 'に対して', 'により', 'による', 'られる', 'れる', 'させる', 'できる', 'される', 'とき', 'ため', 'ようにする', 'おける', 'に対する'];
+
+            const uniqueWords = [...new Set(words)].filter(w => {
+                if (w.length < 2) return false;
+                if (stopWords.includes(w)) return false;
+                if (/^[0-9]+$/.test(w)) return false;
+                return true;
+            });
+
+            // Prioritize longer, more specific terms
+            return uniqueWords.sort((a, b) => b.length - a.length).slice(0, 30);
+        }
+
+        function doReview() {
+            if (filteredQuestions.length === 0) return;
+            const q = filteredQuestions[reviewIndex];
+            const userAnswer = document.getElementById('review-answer').value.trim();
+
+            if (!userAnswer) {
+                alert('回答を入力してください。');
+                return;
+            }
+
+            // Get selected sub question model answer
+            let modelAnswer = '';
+            if (q.subQuestions && q.subQuestions.length > 0) {
+                const idx = parseInt(document.getElementById('review-sub-select').value);
+                modelAnswer = q.subQuestions[idx].modelAnswer;
+            }
+
+            if (!modelAnswer) {
+                alert('この問題には模範解答が設定されていません。');
+                return;
+            }
+
+            const keywords = extractKeywords(modelAnswer);
+            const foundKeywords = [];
+            const missingKeywords = [];
+
+            keywords.forEach(kw => {
+                if (userAnswer.includes(kw)) {
+                    foundKeywords.push(kw);
+                } else {
+                    missingKeywords.push(kw);
+                }
+            });
+
+            const score = keywords.length > 0 ? Math.round((foundKeywords.length / keywords.length) * 100) : 0;
+
+            // Show results
+            const resultsEl = document.getElementById('review-results');
+            resultsEl.style.display = 'block';
+
+            // Score
+            let scoreClass = 'low';
+            if (score >= 70) scoreClass = 'high';
+            else if (score >= 40) scoreClass = 'medium';
+
+            document.getElementById('review-score').innerHTML = `
+                <div class="score-circle ${scoreClass}">${score}%</div>
+                <div class="score-label">キーワード一致率: ${foundKeywords.length} / ${keywords.length} キーワード</div>
+            `;
+
+            // Keywords
+            let keywordsHtml = '';
+            if (foundKeywords.length > 0) {
+                keywordsHtml += '<div class="keywords-title">&#9989; 含まれているキーワード</div><div class="keyword-list">';
+                foundKeywords.forEach(kw => {
+                    keywordsHtml += `<span class="keyword-tag found">${escapeHtml(kw)}</span>`;
+                });
+                keywordsHtml += '</div>';
+            }
+            if (missingKeywords.length > 0) {
+                keywordsHtml += '<div class="keywords-title" style="margin-top:12px;">&#10060; 不足しているキーワード</div><div class="keyword-list">';
+                missingKeywords.forEach(kw => {
+                    keywordsHtml += `<span class="keyword-tag missing">${escapeHtml(kw)}</span>`;
+                });
+                keywordsHtml += '</div>';
+            }
+            document.getElementById('review-keywords').innerHTML = keywordsHtml;
+
+            // Scroll to results
+            resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function showModelAnswer() {
+            if (filteredQuestions.length === 0) return;
+            const q = filteredQuestions[reviewIndex];
+            const userAnswer = document.getElementById('review-answer').value.trim();
+
+            let modelAnswer = '';
+            if (q.subQuestions && q.subQuestions.length > 0) {
+                const idx = parseInt(document.getElementById('review-sub-select').value);
+                modelAnswer = q.subQuestions[idx].modelAnswer;
+            }
+
+            if (!modelAnswer) {
+                alert('この問題には模範解答が設定されていません。');
+                return;
+            }
+
+            const resultsEl = document.getElementById('review-results');
+            resultsEl.style.display = 'block';
+
+            const comparison = document.getElementById('review-comparison');
+            comparison.style.display = 'grid';
+            comparison.innerHTML = `
+                <div class="comparison-col user-answer">
+                    <h4>&#128100; あなたの回答</h4>
+                    <div class="comparison-text">${userAnswer ? escapeHtml(userAnswer) : '<span style="color:var(--text-light);">（未入力）</span>'}</div>
+                </div>
+                <div class="comparison-col model-answer">
+                    <h4>&#128214; 模範解答</h4>
+                    <div class="comparison-text">${escapeHtml(modelAnswer)}</div>
+                </div>
+            `;
+
+            comparison.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // =====================
+        // AI Review (Gemini)
+        // =====================
+        function toggleAISection() {
+            const content = document.getElementById('ai-section-content');
+            const icon = document.getElementById('ai-toggle-icon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.innerHTML = '&#9650;';
+            } else {
+                content.style.display = 'none';
+                icon.innerHTML = '&#9660;';
+            }
+        }
+
+        function saveApiKey() {
+            const key = document.getElementById('gemini-api-key').value.trim();
+            if (key) {
+                localStorage.setItem('essay_gemini_api_key', key);
+                updateAIReviewButton();
+                alert('APIキーを保存しました。');
+            }
+        }
+
+        function clearApiKey() {
+            localStorage.removeItem('essay_gemini_api_key');
+            document.getElementById('gemini-api-key').value = '';
+            updateAIReviewButton();
+            alert('APIキーを削除しました。');
+        }
+
+        function loadApiKey() {
+            const key = localStorage.getItem('essay_gemini_api_key') || '';
+            document.getElementById('gemini-api-key').value = key;
+            updateAIReviewButton();
+        }
+
+        function updateAIReviewButton() {
+            const key = localStorage.getItem('essay_gemini_api_key');
+            const btn = document.getElementById('ai-review-btn');
+            btn.style.display = key ? 'inline-flex' : 'none';
+        }
+
+        async function doAIReview() {
+            if (filteredQuestions.length === 0) return;
+            const apiKey = localStorage.getItem('essay_gemini_api_key');
+            if (!apiKey) {
+                alert('Gemini API キーを設定してください。');
+                toggleAISection();
+                return;
+            }
+
+            const q = filteredQuestions[reviewIndex];
+            const userAnswer = document.getElementById('review-answer').value.trim();
+            if (!userAnswer) {
+                alert('回答を入力してください。');
+                return;
+            }
+
+            let modelAnswer = '';
+            let subQuestionText = '';
+            if (q.subQuestions && q.subQuestions.length > 0) {
+                const idx = parseInt(document.getElementById('review-sub-select').value);
+                modelAnswer = q.subQuestions[idx].modelAnswer;
+                subQuestionText = q.subQuestions[idx].text;
+            }
+
+            const aiContainer = document.getElementById('ai-result-container');
+            aiContainer.style.display = 'block';
+            aiContainer.innerHTML = '<div class="ai-loading"><div class="spinner"></div><div>AI が添削中...</div></div>';
+
+            const prompt = `以下は1級建築施工管理技士の第二次検定の記述式問題です。ユーザーの回答を模範解答と比較して、良い点、改善点、不足しているポイントを具体的に指摘してください。
+
+【問題】
+${q.question}
+
+【小問】
+${subQuestionText}
+
+【模範解答】
+${modelAnswer}
+
+【ユーザーの回答】
+${userAnswer}
+
+以下の形式で回答してください：
+■ 良い点
+（ユーザーの回答で良かった点を箇条書き）
+
+■ 改善点
+（改善すべき点を箇条書き）
+
+■ 不足しているポイント
+（模範解答と比較して不足している内容を箇条書き）
+
+■ 総合評価
+（5段階評価と一言コメント）`;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            temperature: 0.3,
+                            maxOutputTokens: 2048
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => null);
+                    throw new Error(errData?.error?.message || 'API Error: ' + response.status);
+                }
+
+                const data = await response.json();
+                const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'AI からの応答がありませんでした。';
+                aiContainer.innerHTML = `<div class="ai-result">${escapeHtml(aiText)}</div>`;
+            } catch (err) {
+                aiContainer.innerHTML = `<div class="ai-result" style="border-left-color: var(--danger-color); color: var(--danger-color);">AI 添削エラー: ${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        // =====================
+        // Utilities
+        // =====================
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

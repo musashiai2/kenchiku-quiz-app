@@ -118,33 +118,82 @@
 
         .header {
             text-align: center;
-            padding: 40px 20px;
+            padding: 16px 20px;
             background: var(--card-bg);
-            border-radius: 20px;
-            margin-bottom: 30px;
-            box-shadow: var(--shadow-lg);
+            border-radius: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
         }
 
         .header h1 {
-            font-size: 2rem;
+            font-size: 1.4rem;
             color: var(--primary-color);
-            margin-bottom: 10px;
+            margin: 0;
         }
 
         .header p {
             color: var(--text-light);
-            font-size: 1rem;
+            font-size: 0.85rem;
+            margin: 0;
         }
 
         .badge {
             display: inline-block;
             background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
             color: white;
-            padding: 8px 20px;
-            border-radius: 30px;
-            margin-top: 15px;
+            padding: 4px 12px;
+            border-radius: 20px;
             font-weight: 600;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
+        }
+
+        /* 折りたたみセクション */
+        .collapsible-section {
+            background: var(--card-bg);
+            border-radius: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .collapsible-section summary {
+            padding: 14px 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            color: var(--text-color);
+            list-style: none;
+            user-select: none;
+        }
+
+        .collapsible-section summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .collapsible-section summary::before {
+            content: "▶";
+            font-size: 0.7rem;
+            transition: transform 0.2s;
+            color: var(--text-light);
+        }
+
+        .collapsible-section[open] summary::before {
+            transform: rotate(90deg);
+        }
+
+        .collapsible-section summary .section-icon {
+            font-size: 1.2rem;
+        }
+
+        .collapsible-section .section-content {
+            padding: 0 20px 20px;
         }
 
         /* ===================== */
@@ -1052,176 +1101,11 @@
     <div class="container">
         <div class="header">
             <h1>資格試験クイズアプリ</h1>
-            <p>建築・不動産・会計・メンタルヘルス関連資格</p>
             <span class="badge">複数資格対応</span>
         </div>
 
-        <!-- Learning Reminder Section -->
-        <div class="learning-reminder" id="learning-reminder">
-            <div class="reminder-header">
-                <span class="reminder-icon">🔔</span>
-                <h2>学習リマインダー</h2>
-            </div>
-            <div class="reminder-content">
-                <div class="reminder-card">
-                    <div class="days-since-last" id="days-since-last">--</div>
-                    <div class="reminder-label">前回の学習から</div>
-                    <div class="reminder-message" id="reminder-message">学習を始めましょう!</div>
-                </div>
-                <div class="reminder-card">
-                    <div class="days-since-last good" id="today-progress">0</div>
-                    <div class="reminder-label">今日の学習問題数</div>
-                </div>
-            </div>
-            <div class="daily-goal">
-                <div class="daily-goal-header">
-                    <span class="daily-goal-title">今日の目標</span>
-                    <div class="daily-goal-setting">
-                        <select id="daily-goal-select" onchange="updateDailyGoal()">
-                            <option value="10">10問</option>
-                            <option value="20">20問</option>
-                            <option value="30">30問</option>
-                            <option value="50">50問</option>
-                            <option value="100">100問</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="daily-goal-progress">
-                    <div class="daily-goal-bar">
-                        <div class="daily-goal-fill" id="daily-goal-fill" style="width: 0%"></div>
-                    </div>
-                    <div class="daily-goal-text">
-                        <span id="daily-goal-current">0問達成</span>
-                        <span id="daily-goal-remaining">目標まであと--問</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Learning Calendar Section -->
-        <div class="learning-calendar" id="learning-calendar">
-            <div class="calendar-header">
-                <div class="calendar-header-left">
-                    <span class="calendar-icon">📅</span>
-                    <h2>学習カレンダー</h2>
-                </div>
-                <div class="streak-badge" id="streak-badge">
-                    <span class="fire">🔥</span>
-                    <span id="calendar-streak">0日連続</span>
-                </div>
-            </div>
-            <div class="calendar-grid">
-                <div class="calendar-container">
-                    <div class="calendar-week-labels">
-                        <div class="calendar-week-label">日</div>
-                        <div class="calendar-week-label">月</div>
-                        <div class="calendar-week-label">火</div>
-                        <div class="calendar-week-label">水</div>
-                        <div class="calendar-week-label">木</div>
-                        <div class="calendar-week-label">金</div>
-                        <div class="calendar-week-label">土</div>
-                    </div>
-                    <div class="calendar-weeks" id="calendar-weeks">
-                        <!-- Dynamically populated -->
-                    </div>
-                </div>
-            </div>
-            <div class="calendar-legend">
-                <span>少</span>
-                <div class="legend-item level-0"></div>
-                <div class="legend-item level-1"></div>
-                <div class="legend-item level-2"></div>
-                <div class="legend-item level-3"></div>
-                <div class="legend-item level-4"></div>
-                <span>多</span>
-            </div>
-        </div>
-        <div class="calendar-tooltip" id="calendar-tooltip"></div>
-
-        <!-- Achievements Section -->
-        <div class="achievements" id="achievements">
-            <div class="achievements-header">
-                <span class="achievements-icon">🏆</span>
-                <h2>達成バッジ</h2>
-            </div>
-            <div class="badges-grid" id="badges-grid">
-                <!-- Dynamically populated -->
-            </div>
-            <div class="motivation-message" id="motivation-message">
-                <div class="motivation-emoji">💪</div>
-                <div class="motivation-text">今日も頑張りましょう!</div>
-                <div class="motivation-subtext">毎日の積み重ねが合格への近道です</div>
-            </div>
-        </div>
-
-        <!-- Dashboard Section -->
-        <div class="dashboard" id="dashboard">
-            <div class="dashboard-header">
-                <span class="dashboard-icon">📊</span>
-                <h2>学習進捗ダッシュボード</h2>
-            </div>
-
-            <!-- Overall Stats -->
-            <div class="overall-stats" id="overall-stats">
-                <div class="overall-stat-card">
-                    <div class="overall-stat-value" id="total-accuracy">--%</div>
-                    <div class="overall-stat-label">全体正答率</div>
-                </div>
-                <div class="overall-stat-card green">
-                    <div class="overall-stat-value" id="total-questions-studied">0</div>
-                    <div class="overall-stat-label">学習問題数</div>
-                </div>
-                <div class="overall-stat-card orange">
-                    <div class="overall-stat-value" id="streak-days">0日</div>
-                    <div class="overall-stat-label">連続学習</div>
-                </div>
-                <div class="overall-stat-card purple">
-                    <div class="overall-stat-value" id="weekly-questions">0</div>
-                    <div class="overall-stat-label">今週の問題数</div>
-                </div>
-            </div>
-
-            <!-- Qualification Stats -->
-            <div class="qualification-stats">
-                <div class="qualification-stats-title">資格別 学習状況</div>
-                <div class="qualification-grid" id="qualification-grid">
-                    <!-- Dynamically populated -->
-                </div>
-            </div>
-        </div>
-
-        <div class="features">
-            <h3>アプリの機能（各クイズ内で利用可能）</h3>
-            <div class="feature-list">
-                <div class="feature-item">
-                    <span class="feature-icon">📝</span>
-                    <span class="feature-text">四肢択一式</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">⏱️</span>
-                    <span class="feature-text">タイマー付き</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">🔄</span>
-                    <span class="feature-text">復習機能</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">⭐</span>
-                    <span class="feature-text">ブックマーク</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">📊</span>
-                    <span class="feature-text">学習統計</span>
-                </div>
-                <div class="feature-item">
-                    <span class="feature-icon">🌙</span>
-                    <span class="feature-text">ダークモード</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- 1級建築施工管理技士 -->
-        <div class="section">
+        <!-- 1級建築施工管理技士（最優先表示） -->
+        <div class="section" style="margin-bottom: 20px;">
             <div class="section-title">
                 <span class="section-icon">🏗️</span>
                 <h2>1級建築施工管理技士（令和1年〜7年度）</h2>
@@ -1269,6 +1153,12 @@
                     <span class="questions">82問</span>
                     <span class="arrow">→</span>
                 </a>
+                <a href="essay/index.html" class="year-card purple" style="grid-column: 1 / -1;">
+                    <h3>第二次検定 記述式問題（R1〜R7）</h3>
+                    <p class="info">フラッシュカード・ボイス読み上げ・回答添削</p>
+                    <span class="questions">28問（模範解答付き）</span>
+                    <span class="arrow">→</span>
+                </a>
             </div>
         </div>
 
@@ -1305,6 +1195,176 @@
                 </a>
             </div>
         </div>
+
+        <!-- 学習サポート機能（折りたたみ式） -->
+        <details class="collapsible-section">
+            <summary>
+                <span class="section-icon">🔔</span>
+                学習リマインダー・目標設定
+            </summary>
+            <div class="section-content">
+                <div class="learning-reminder" id="learning-reminder" style="margin-bottom: 0; box-shadow: none; padding: 0;">
+                    <div class="reminder-content">
+                        <div class="reminder-card">
+                            <div class="days-since-last" id="days-since-last">--</div>
+                            <div class="reminder-label">前回の学習から</div>
+                            <div class="reminder-message" id="reminder-message">学習を始めましょう!</div>
+                        </div>
+                        <div class="reminder-card">
+                            <div class="days-since-last good" id="today-progress">0</div>
+                            <div class="reminder-label">今日の学習問題数</div>
+                        </div>
+                    </div>
+                    <div class="daily-goal">
+                        <div class="daily-goal-header">
+                            <span class="daily-goal-title">今日の目標</span>
+                            <div class="daily-goal-setting">
+                                <select id="daily-goal-select" onchange="updateDailyGoal()">
+                                    <option value="10">10問</option>
+                                    <option value="20">20問</option>
+                                    <option value="30">30問</option>
+                                    <option value="50">50問</option>
+                                    <option value="100">100問</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="daily-goal-progress">
+                            <div class="daily-goal-bar">
+                                <div class="daily-goal-fill" id="daily-goal-fill" style="width: 0%"></div>
+                            </div>
+                            <div class="daily-goal-text">
+                                <span id="daily-goal-current">0問達成</span>
+                                <span id="daily-goal-remaining">目標まであと--問</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </details>
+
+        <details class="collapsible-section">
+            <summary>
+                <span class="section-icon">📅</span>
+                学習カレンダー
+                <span class="streak-badge" id="streak-badge" style="margin-left: auto; padding: 4px 10px; font-size: 0.8rem;">
+                    <span class="fire">🔥</span>
+                    <span id="calendar-streak">0日連続</span>
+                </span>
+            </summary>
+            <div class="section-content">
+                <div class="learning-calendar" id="learning-calendar" style="margin-bottom: 0; box-shadow: none; padding: 0;">
+                    <div class="calendar-grid">
+                        <div class="calendar-container">
+                            <div class="calendar-week-labels">
+                                <div class="calendar-week-label">日</div>
+                                <div class="calendar-week-label">月</div>
+                                <div class="calendar-week-label">火</div>
+                                <div class="calendar-week-label">水</div>
+                                <div class="calendar-week-label">木</div>
+                                <div class="calendar-week-label">金</div>
+                                <div class="calendar-week-label">土</div>
+                            </div>
+                            <div class="calendar-weeks" id="calendar-weeks"></div>
+                        </div>
+                    </div>
+                    <div class="calendar-legend">
+                        <span>少</span>
+                        <div class="legend-item level-0"></div>
+                        <div class="legend-item level-1"></div>
+                        <div class="legend-item level-2"></div>
+                        <div class="legend-item level-3"></div>
+                        <div class="legend-item level-4"></div>
+                        <span>多</span>
+                    </div>
+                </div>
+            </div>
+        </details>
+        <div class="calendar-tooltip" id="calendar-tooltip"></div>
+
+        <details class="collapsible-section">
+            <summary>
+                <span class="section-icon">🏆</span>
+                達成バッジ
+            </summary>
+            <div class="section-content">
+                <div class="achievements" id="achievements" style="margin-bottom: 0; box-shadow: none; padding: 0;">
+                    <div class="badges-grid" id="badges-grid"></div>
+                    <div class="motivation-message" id="motivation-message">
+                        <div class="motivation-emoji">💪</div>
+                        <div class="motivation-text">今日も頑張りましょう!</div>
+                        <div class="motivation-subtext">毎日の積み重ねが合格への近道です</div>
+                    </div>
+                </div>
+            </div>
+        </details>
+
+        <details class="collapsible-section">
+            <summary>
+                <span class="section-icon">📊</span>
+                学習進捗ダッシュボード
+            </summary>
+            <div class="section-content">
+                <div class="dashboard" id="dashboard" style="margin-bottom: 0; box-shadow: none; padding: 0;">
+                    <div class="overall-stats" id="overall-stats">
+                        <div class="overall-stat-card">
+                            <div class="overall-stat-value" id="total-accuracy">--%</div>
+                            <div class="overall-stat-label">全体正答率</div>
+                        </div>
+                        <div class="overall-stat-card green">
+                            <div class="overall-stat-value" id="total-questions-studied">0</div>
+                            <div class="overall-stat-label">学習問題数</div>
+                        </div>
+                        <div class="overall-stat-card orange">
+                            <div class="overall-stat-value" id="streak-days">0日</div>
+                            <div class="overall-stat-label">連続学習</div>
+                        </div>
+                        <div class="overall-stat-card purple">
+                            <div class="overall-stat-value" id="weekly-questions">0</div>
+                            <div class="overall-stat-label">今週の問題数</div>
+                        </div>
+                    </div>
+                    <div class="qualification-stats">
+                        <div class="qualification-stats-title">資格別 学習状況</div>
+                        <div class="qualification-grid" id="qualification-grid"></div>
+                    </div>
+                </div>
+            </div>
+        </details>
+
+        <details class="collapsible-section">
+            <summary>
+                <span class="section-icon">⚙️</span>
+                アプリの機能
+            </summary>
+            <div class="section-content">
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <span class="feature-icon">📝</span>
+                        <span class="feature-text">四肢択一式</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">⏱️</span>
+                        <span class="feature-text">タイマー付き</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">🔄</span>
+                        <span class="feature-text">復習機能</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">⭐</span>
+                        <span class="feature-text">ブックマーク</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">📊</span>
+                        <span class="feature-text">学習統計</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">🌙</span>
+                        <span class="feature-text">ダークモード</span>
+                    </div>
+                </div>
+            </div>
+        </details>
 
         <div class="footer">
             <p>※学習用サンプル問題です。本試験とは異なる場合があります。</p>
