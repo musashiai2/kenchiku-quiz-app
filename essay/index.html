@@ -1073,7 +1073,7 @@
 
         <div class="header">
             <h1>&#128221; 第二次検定 記述式問題 学習ツール</h1>
-            <p>1級建築施工管理技士 - フラッシュカード / ボイス読み上げ / 回答添削</p>
+            <p>1級建築施工管理技士 - 模範解答 / フラッシュカード / 回答添削 / ボイス読み上げ</p>
         </div>
 
         <!-- Filters -->
@@ -1090,28 +1090,28 @@
 
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab-btn active" data-tab="flashcard" onclick="switchTab('flashcard')">
-                <span class="tab-icon">&#127183;</span>
-                フラッシュカード
-            </button>
-            <button class="tab-btn" data-tab="answers" onclick="switchTab('answers')">
+            <button class="tab-btn active" data-tab="answers" onclick="switchTab('answers')">
                 <span class="tab-icon">&#128214;</span>
                 模範解答
             </button>
-            <button class="tab-btn" data-tab="voice" onclick="switchTab('voice')">
-                <span class="tab-icon">&#128266;</span>
-                解答ボイス読み上げ
+            <button class="tab-btn" data-tab="flashcard" onclick="switchTab('flashcard')">
+                <span class="tab-icon">&#127183;</span>
+                フラッシュカード
             </button>
             <button class="tab-btn" data-tab="review" onclick="switchTab('review')">
                 <span class="tab-icon">&#9998;</span>
-                解答添削
+                回答添削
+            </button>
+            <button class="tab-btn" data-tab="voice" onclick="switchTab('voice')">
+                <span class="tab-icon">&#128266;</span>
+                ボイス読み上げ
             </button>
         </div>
 
         <!-- ==================== -->
         <!-- Tab 1: Flash Card   -->
         <!-- ==================== -->
-        <div class="tab-content active" id="tab-flashcard">
+        <div class="tab-content" id="tab-flashcard">
             <div class="card">
                 <div class="flashcard-controls">
                     <span class="flashcard-counter" id="fc-counter">0 / 0</span>
@@ -1149,7 +1149,7 @@
         <!-- ==================== -->
         <!-- Tab 2: Model Answers -->
         <!-- ==================== -->
-        <div class="tab-content" id="tab-answers">
+        <div class="tab-content active" id="tab-answers">
             <div class="card">
                 <div class="flashcard-controls">
                     <span class="flashcard-counter" id="answers-counter">0 問</span>
@@ -1190,7 +1190,7 @@
                     </label>
                 </div>
 
-                <div class="voice-status" id="voice-status">再生ボタンを押して読み上げを開始</div>
+                <div class="voice-status" id="voice-status">再生ボタンを押して模範解答を読み上げ</div>
 
                 <div class="voice-nav">
                     <button class="btn btn-secondary" onclick="voicePrevQuestion()">&#9664; 前へ</button>
@@ -1547,8 +1547,68 @@
         }
 
         // =====================
-        // Voice
+        // Voice (answers only)
         // =====================
+
+        // Voice selection - prefer high quality Japanese voices
+        let bestJapaneseVoice = null;
+
+        function loadVoices() {
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length === 0) return;
+
+            const jaVoices = voices.filter(v => v.lang === 'ja-JP' || v.lang.startsWith('ja'));
+            if (jaVoices.length === 0) return;
+
+            // Priority: Google > Microsoft Online/Natural > others
+            const priorityPatterns = [
+                /google/i,
+                /microsoft.*online/i,
+                /natural/i,
+                /enhanced/i,
+                /premium/i,
+                /microsoft/i
+            ];
+
+            for (const pattern of priorityPatterns) {
+                const match = jaVoices.find(v => pattern.test(v.name));
+                if (match) {
+                    bestJapaneseVoice = match;
+                    console.log('Selected voice:', match.name);
+                    return;
+                }
+            }
+            bestJapaneseVoice = jaVoices[0];
+            console.log('Fallback voice:', jaVoices[0].name);
+        }
+
+        if ('speechSynthesis' in window) {
+            loadVoices();
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        // Split text into short chunks (by sentence) to avoid Chrome's ~15s cutoff bug
+        function splitIntoChunks(text) {
+            const chunks = [];
+            // Split by Japanese period, newline, or other breaks
+            const sentences = text.split(/(?<=[。．\.\!\？\?！\n])/g);
+            for (const s of sentences) {
+                const trimmed = s.trim();
+                if (trimmed.length === 0) continue;
+                // If still too long (>80 chars), split by comma
+                if (trimmed.length > 80) {
+                    const parts = trimmed.split(/(?<=[、,])/g);
+                    for (const p of parts) {
+                        const pt = p.trim();
+                        if (pt.length > 0) chunks.push(pt);
+                    }
+                } else {
+                    chunks.push(trimmed);
+                }
+            }
+            return chunks.length > 0 ? chunks : [text];
+        }
+
         function updateVoiceDisplay() {
             const counter = document.getElementById('voice-counter');
             const display = document.getElementById('voice-text-content');
@@ -1562,49 +1622,46 @@
             const q = filteredQuestions[voiceIndex];
             counter.textContent = (voiceIndex + 1) + ' / ' + filteredQuestions.length;
 
-            // Build segments for speech and display
+            // Build segments - ANSWERS ONLY
             voiceTextSegments = [];
             let displayHtml = '';
 
-            // Question header
+            // Header (display only, not read)
             displayHtml += `<div class="card-meta" style="margin-bottom:10px;"><span class="card-badge year">${q.yearShort}</span><span class="card-badge category">${q.category}</span></div>`;
             displayHtml += `<div style="font-weight:700; color:var(--primary-color); margin-bottom:10px;">${escapeHtml(q.questionNumber)} - ${escapeHtml(q.title)}</div>`;
 
-            // Main question
-            const mainText = q.question;
-            const segId = voiceTextSegments.length;
-            voiceTextSegments.push({ type: 'question', text: mainText });
-            displayHtml += `<div id="voice-seg-${segId}" style="margin-bottom:12px; padding:8px; border-radius:8px; transition: background 0.3s;">${escapeHtml(mainText)}</div>`;
-
-            // Sub questions and answers
             if (q.subQuestions && q.subQuestions.length > 0) {
                 q.subQuestions.forEach(sub => {
-                    // Sub question text
-                    const sqSegId = voiceTextSegments.length;
-                    voiceTextSegments.push({ type: 'sub-question', text: sub.id + '。 ' + sub.text });
-                    displayHtml += `<div id="voice-seg-${sqSegId}" class="sub-question" style="transition: background 0.3s;">${escapeHtml(sub.id)}: ${escapeHtml(sub.text)}</div>`;
+                    const segId = voiceTextSegments.length;
+                    // Only read the model answer
+                    const answerText = sub.modelAnswer;
+                    const chunks = splitIntoChunks(answerText);
+                    voiceTextSegments.push({ segId: segId, chunks: chunks, label: sub.id });
 
-                    // Model answer
-                    const saSegId = voiceTextSegments.length;
-                    voiceTextSegments.push({ type: 'answer', text: '模範解答。 ' + sub.modelAnswer });
-                    displayHtml += `<div id="voice-seg-${saSegId}" class="sub-answer" style="transition: background 0.3s;"><div class="sub-answer-label">${escapeHtml(sub.id)} - 模範解答</div>${escapeHtml(sub.modelAnswer)}</div>`;
+                    displayHtml += `<div id="voice-seg-${segId}" class="sub-answer" style="transition: background 0.3s; margin-bottom:10px;">`;
+                    displayHtml += `<div class="sub-answer-label">${escapeHtml(sub.id)} - 模範解答</div>`;
+                    displayHtml += `<div>${escapeHtml(sub.modelAnswer)}</div>`;
+                    displayHtml += `</div>`;
                 });
             }
 
             display.innerHTML = displayHtml;
         }
 
+        let currentChunkIndex = 0;
+        let chromeResumeTimer = null;
+
         function voicePlayPause() {
             if (!('speechSynthesis' in window)) {
                 alert('お使いのブラウザは音声合成に対応していません。');
                 return;
             }
-
             if (filteredQuestions.length === 0) return;
 
             if (isPaused) {
                 window.speechSynthesis.resume();
                 isPaused = false;
+                startChromeWorkaround();
                 updateVoiceStatus('reading');
                 return;
             }
@@ -1615,55 +1672,32 @@
             }
 
             currentSegmentIndex = 0;
+            currentChunkIndex = 0;
             speakNextSegment();
         }
 
-        // Voice selection - prefer high quality Japanese voices
-        let bestJapaneseVoice = null;
-        let voicesLoaded = false;
-
-        function loadVoices() {
-            const voices = window.speechSynthesis.getVoices();
-            if (voices.length === 0) return;
-            voicesLoaded = true;
-
-            // Filter Japanese voices
-            const jaVoices = voices.filter(v => v.lang === 'ja-JP' || v.lang.startsWith('ja'));
-            if (jaVoices.length === 0) return;
-
-            // Priority order for higher quality voices
-            const priorityPatterns = [
-                /google/i,
-                /microsoft.*online/i,
-                /enhanced/i,
-                /premium/i,
-                /natural/i,
-                /microsoft/i
-            ];
-
-            for (const pattern of priorityPatterns) {
-                const match = jaVoices.find(v => pattern.test(v.name));
-                if (match) {
-                    bestJapaneseVoice = match;
-                    console.log('Selected voice:', match.name);
-                    return;
+        // Chrome workaround: pause/resume every 10s to prevent timeout
+        function startChromeWorkaround() {
+            stopChromeWorkaround();
+            chromeResumeTimer = setInterval(() => {
+                if (isSpeaking && !isPaused && window.speechSynthesis.speaking) {
+                    window.speechSynthesis.pause();
+                    window.speechSynthesis.resume();
                 }
-            }
-
-            // Fallback to first Japanese voice
-            bestJapaneseVoice = jaVoices[0];
-            console.log('Fallback voice:', jaVoices[0].name);
+            }, 10000);
         }
 
-        // Load voices (async in some browsers)
-        if ('speechSynthesis' in window) {
-            loadVoices();
-            window.speechSynthesis.onvoiceschanged = loadVoices;
+        function stopChromeWorkaround() {
+            if (chromeResumeTimer) {
+                clearInterval(chromeResumeTimer);
+                chromeResumeTimer = null;
+            }
         }
 
         function speakNextSegment() {
             if (currentSegmentIndex >= voiceTextSegments.length) {
                 isSpeaking = false;
+                stopChromeWorkaround();
                 updateVoiceStatus('finished');
                 clearHighlights();
 
@@ -1672,53 +1706,91 @@
                     updateVoiceDisplay();
                     setTimeout(() => {
                         currentSegmentIndex = 0;
+                        currentChunkIndex = 0;
                         speakNextSegment();
-                    }, 1000);
+                    }, 1500);
                 }
                 return;
             }
 
             const segment = voiceTextSegments[currentSegmentIndex];
-            const utterance = new SpeechSynthesisUtterance(segment.text);
+
+            // Highlight current segment
+            clearHighlights();
+            const segEl = document.getElementById('voice-seg-' + segment.segId);
+            if (segEl) {
+                segEl.classList.add('voice-text-highlight');
+                segEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            speakNextChunk();
+        }
+
+        function speakNextChunk() {
+            const segment = voiceTextSegments[currentSegmentIndex];
+            if (!segment || currentChunkIndex >= segment.chunks.length) {
+                // Move to next segment
+                currentSegmentIndex++;
+                currentChunkIndex = 0;
+                // Small pause between segments
+                setTimeout(() => speakNextSegment(), 500);
+                return;
+            }
+
+            const chunkText = segment.chunks[currentChunkIndex];
+            const utterance = new SpeechSynthesisUtterance(chunkText);
             utterance.lang = 'ja-JP';
             utterance.rate = parseFloat(document.getElementById('voice-speed').value);
             if (bestJapaneseVoice) {
                 utterance.voice = bestJapaneseVoice;
             }
 
-            // Highlight current segment
-            clearHighlights();
-            const segEl = document.getElementById('voice-seg-' + currentSegmentIndex);
-            if (segEl) {
-                segEl.classList.add('voice-text-highlight');
-                segEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
+            // Safety: detect if utterance gets stuck (no event after 30s)
+            let finished = false;
+            const safetyTimer = setTimeout(() => {
+                if (!finished && isSpeaking) {
+                    console.warn('Speech stuck, forcing next chunk');
+                    window.speechSynthesis.cancel();
+                    currentChunkIndex++;
+                    setTimeout(() => speakNextChunk(), 200);
+                }
+            }, 30000);
 
             utterance.onend = () => {
-                currentSegmentIndex++;
-                speakNextSegment();
+                finished = true;
+                clearTimeout(safetyTimer);
+                currentChunkIndex++;
+                speakNextChunk();
             };
 
             utterance.onerror = (e) => {
-                if (e.error !== 'interrupted' && e.error !== 'canceled') {
-                    console.error('Speech error:', e);
-                }
-                isSpeaking = false;
-                updateVoiceStatus('stopped');
-                clearHighlights();
+                finished = true;
+                clearTimeout(safetyTimer);
+                if (e.error === 'interrupted' || e.error === 'canceled') return;
+                console.error('Speech error:', e.error);
+                // Try next chunk instead of stopping completely
+                currentChunkIndex++;
+                setTimeout(() => speakNextChunk(), 200);
             };
 
             currentUtterance = utterance;
             isSpeaking = true;
             isPaused = false;
             updateVoiceStatus('reading');
-            window.speechSynthesis.speak(utterance);
+            startChromeWorkaround();
+
+            // Cancel any pending speech before speaking (Chrome queue bug)
+            window.speechSynthesis.cancel();
+            setTimeout(() => {
+                window.speechSynthesis.speak(utterance);
+            }, 50);
         }
 
         function voicePause() {
             if (isSpeaking && !isPaused) {
                 window.speechSynthesis.pause();
                 isPaused = true;
+                stopChromeWorkaround();
                 updateVoiceStatus('paused');
             }
         }
@@ -1728,6 +1800,8 @@
             isSpeaking = false;
             isPaused = false;
             currentSegmentIndex = 0;
+            currentChunkIndex = 0;
+            stopChromeWorkaround();
             clearHighlights();
             updateVoiceStatus('stopped');
         }
@@ -1740,13 +1814,15 @@
 
         function updateVoiceStatus(status) {
             const el = document.getElementById('voice-status');
+            const segInfo = voiceTextSegments.length > 0 && currentSegmentIndex < voiceTextSegments.length
+                ? ` (${currentSegmentIndex + 1}/${voiceTextSegments.length})`
+                : '';
             switch (status) {
                 case 'reading':
-                    el.textContent = '&#128266; 読み上げ中...';
-                    el.innerHTML = '&#128266; 読み上げ中...';
+                    el.innerHTML = '&#128266; 読み上げ中...' + segInfo;
                     break;
                 case 'paused':
-                    el.innerHTML = '&#9208; 一時停止中';
+                    el.innerHTML = '&#9208; 一時停止中' + segInfo;
                     break;
                 case 'stopped':
                     el.innerHTML = '&#9632; 停止';
@@ -1755,7 +1831,7 @@
                     el.innerHTML = '&#9989; 読み上げ完了';
                     break;
                 default:
-                    el.innerHTML = '再生ボタンを押して読み上げを開始';
+                    el.innerHTML = '再生ボタンを押して模範解答を読み上げ';
             }
         }
 
