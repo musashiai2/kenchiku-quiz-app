@@ -1282,7 +1282,6 @@
         let isPaused = false;
         let currentUtterance = null;
         let voiceTextSegments = [];
-        let currentSegmentIndex = 0;
 
         const YEAR_OPTIONS = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7'];
         const CATEGORY_OPTIONS = ['経験記述', '仮設計画', '安全管理', '工程管理', '施工留意事項'];
@@ -1648,8 +1647,10 @@
             display.innerHTML = displayHtml;
         }
 
-        let currentChunkIndex = 0;
-        let chromeResumeTimer = null;
+        // All chunks flattened for sequential playback
+        let allChunks = [];    // [{text, segId}, ...]
+        let chunkIndex = 0;
+        let speechId = 0;      // Incremented on each play/stop to ignore stale callbacks
 
         function voicePlayPause() {
             if (!('speechSynthesis' in window)) {
@@ -1661,7 +1662,6 @@
             if (isPaused) {
                 window.speechSynthesis.resume();
                 isPaused = false;
-                startChromeWorkaround();
                 updateVoiceStatus('reading');
                 return;
             }
@@ -1671,137 +1671,104 @@
                 return;
             }
 
-            currentSegmentIndex = 0;
-            currentChunkIndex = 0;
-            speakNextSegment();
+            // Build flat chunk list from segments
+            allChunks = [];
+            voiceTextSegments.forEach(seg => {
+                seg.chunks.forEach(text => {
+                    allChunks.push({ text: text, segId: seg.segId });
+                });
+            });
+
+            if (allChunks.length === 0) return;
+
+            chunkIndex = 0;
+            speechId++;
+            isSpeaking = true;
+            isPaused = false;
+            speakChunk(speechId);
         }
 
-        // Chrome workaround: pause/resume every 10s to prevent timeout
-        function startChromeWorkaround() {
-            stopChromeWorkaround();
-            chromeResumeTimer = setInterval(() => {
-                if (isSpeaking && !isPaused && window.speechSynthesis.speaking) {
-                    window.speechSynthesis.pause();
-                    window.speechSynthesis.resume();
-                }
-            }, 10000);
-        }
+        function speakChunk(id) {
+            // Ignore if this play session was canceled
+            if (id !== speechId) return;
 
-        function stopChromeWorkaround() {
-            if (chromeResumeTimer) {
-                clearInterval(chromeResumeTimer);
-                chromeResumeTimer = null;
-            }
-        }
-
-        function speakNextSegment() {
-            if (currentSegmentIndex >= voiceTextSegments.length) {
+            if (chunkIndex >= allChunks.length) {
+                // Done
                 isSpeaking = false;
-                stopChromeWorkaround();
                 updateVoiceStatus('finished');
                 clearHighlights();
 
                 if (autoPlay && filteredQuestions.length > 0) {
                     voiceIndex = (voiceIndex + 1) % filteredQuestions.length;
                     updateVoiceDisplay();
+                    const nextId = ++speechId;
                     setTimeout(() => {
-                        currentSegmentIndex = 0;
-                        currentChunkIndex = 0;
-                        speakNextSegment();
+                        allChunks = [];
+                        voiceTextSegments.forEach(seg => {
+                            seg.chunks.forEach(text => {
+                                allChunks.push({ text: text, segId: seg.segId });
+                            });
+                        });
+                        chunkIndex = 0;
+                        isSpeaking = true;
+                        speakChunk(nextId);
                     }, 1500);
                 }
                 return;
             }
 
-            const segment = voiceTextSegments[currentSegmentIndex];
+            const chunk = allChunks[chunkIndex];
 
-            // Highlight current segment
+            // Highlight
             clearHighlights();
-            const segEl = document.getElementById('voice-seg-' + segment.segId);
+            const segEl = document.getElementById('voice-seg-' + chunk.segId);
             if (segEl) {
                 segEl.classList.add('voice-text-highlight');
                 segEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
 
-            speakNextChunk();
-        }
+            updateVoiceStatus('reading');
 
-        function speakNextChunk() {
-            const segment = voiceTextSegments[currentSegmentIndex];
-            if (!segment || currentChunkIndex >= segment.chunks.length) {
-                // Move to next segment
-                currentSegmentIndex++;
-                currentChunkIndex = 0;
-                // Small pause between segments
-                setTimeout(() => speakNextSegment(), 500);
-                return;
-            }
-
-            const chunkText = segment.chunks[currentChunkIndex];
-            const utterance = new SpeechSynthesisUtterance(chunkText);
+            const utterance = new SpeechSynthesisUtterance(chunk.text);
             utterance.lang = 'ja-JP';
-            utterance.rate = parseFloat(document.getElementById('voice-speed').value);
+            utterance.rate = Math.min(parseFloat(document.getElementById('voice-speed').value), 3.0);
             if (bestJapaneseVoice) {
                 utterance.voice = bestJapaneseVoice;
             }
 
-            // Safety: detect if utterance gets stuck (no event after 30s)
-            let finished = false;
-            const safetyTimer = setTimeout(() => {
-                if (!finished && isSpeaking) {
-                    console.warn('Speech stuck, forcing next chunk');
-                    window.speechSynthesis.cancel();
-                    currentChunkIndex++;
-                    setTimeout(() => speakNextChunk(), 200);
-                }
-            }, 30000);
-
             utterance.onend = () => {
-                finished = true;
-                clearTimeout(safetyTimer);
-                currentChunkIndex++;
-                speakNextChunk();
+                if (id !== speechId) return;
+                chunkIndex++;
+                speakChunk(id);
             };
 
             utterance.onerror = (e) => {
-                finished = true;
-                clearTimeout(safetyTimer);
+                if (id !== speechId) return;
                 if (e.error === 'interrupted' || e.error === 'canceled') return;
-                console.error('Speech error:', e.error);
-                // Try next chunk instead of stopping completely
-                currentChunkIndex++;
-                setTimeout(() => speakNextChunk(), 200);
+                console.error('Speech error:', e.error, 'chunk:', chunk.text.substring(0, 30));
+                // Skip to next chunk
+                chunkIndex++;
+                setTimeout(() => speakChunk(id), 300);
             };
 
             currentUtterance = utterance;
-            isSpeaking = true;
-            isPaused = false;
-            updateVoiceStatus('reading');
-            startChromeWorkaround();
-
-            // Cancel any pending speech before speaking (Chrome queue bug)
-            window.speechSynthesis.cancel();
-            setTimeout(() => {
-                window.speechSynthesis.speak(utterance);
-            }, 50);
+            window.speechSynthesis.speak(utterance);
         }
 
         function voicePause() {
             if (isSpeaking && !isPaused) {
                 window.speechSynthesis.pause();
                 isPaused = true;
-                stopChromeWorkaround();
                 updateVoiceStatus('paused');
             }
         }
 
         function voiceStop() {
+            speechId++;  // Invalidate any in-flight callbacks
             window.speechSynthesis.cancel();
             isSpeaking = false;
             isPaused = false;
-            currentSegmentIndex = 0;
-            currentChunkIndex = 0;
-            stopChromeWorkaround();
+            chunkIndex = 0;
             clearHighlights();
             updateVoiceStatus('stopped');
         }
@@ -1814,15 +1781,15 @@
 
         function updateVoiceStatus(status) {
             const el = document.getElementById('voice-status');
-            const segInfo = voiceTextSegments.length > 0 && currentSegmentIndex < voiceTextSegments.length
-                ? ` (${currentSegmentIndex + 1}/${voiceTextSegments.length})`
+            const progress = allChunks.length > 0
+                ? ` (${Math.min(chunkIndex + 1, allChunks.length)}/${allChunks.length})`
                 : '';
             switch (status) {
                 case 'reading':
-                    el.innerHTML = '&#128266; 読み上げ中...' + segInfo;
+                    el.innerHTML = '&#128266; 読み上げ中...' + progress;
                     break;
                 case 'paused':
-                    el.innerHTML = '&#9208; 一時停止中' + segInfo;
+                    el.innerHTML = '&#9208; 一時停止中' + progress;
                     break;
                 case 'stopped':
                     el.innerHTML = '&#9632; 停止';
