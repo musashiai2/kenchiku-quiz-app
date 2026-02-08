@@ -1594,7 +1594,7 @@
         const audioCache = {};
 
         function getApiKey() {
-            return localStorage.getItem('essay_gemini_api_key') || '';
+            return localStorage.getItem('essay_gemini_api_key') || 'AIzaSyDaAXN3DVJDX5Iv-z33h8p-gPwFIVb1Ek4';
         }
 
         function useGeminiTTS() {
@@ -2150,13 +2150,13 @@
         }
 
         function loadApiKey() {
-            const key = localStorage.getItem('essay_gemini_api_key') || '';
+            const key = localStorage.getItem('essay_gemini_api_key') || 'AIzaSyDaAXN3DVJDX5Iv-z33h8p-gPwFIVb1Ek4';
             document.getElementById('gemini-api-key').value = key;
             updateAIReviewButton();
         }
 
         function updateAIReviewButton() {
-            const key = localStorage.getItem('essay_gemini_api_key');
+            const key = getApiKey();
             const btn = document.getElementById('ai-review-btn');
             btn.style.display = key ? 'inline-flex' : 'none';
         }
