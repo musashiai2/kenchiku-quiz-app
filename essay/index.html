@@ -1180,7 +1180,7 @@
                 <div class="voice-settings">
                     <div class="voice-setting-item">
                         <span>&#128034;</span>
-                        <input type="range" id="voice-speed" min="0.5" max="3.0" step="0.1" value="1.0" oninput="updateSpeedDisplay()">
+                        <input type="range" id="voice-speed" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateSpeedDisplay()">
                         <span class="speed-value" id="speed-value">1.0x</span>
                         <span>&#128007;</span>
                     </div>
@@ -1546,67 +1546,9 @@
         }
 
         // =====================
-        // Voice (answers only)
+        // Voice (answers only - simple approach like original)
         // =====================
-
-        // Voice selection - prefer high quality Japanese voices
-        let bestJapaneseVoice = null;
-
-        function loadVoices() {
-            const voices = window.speechSynthesis.getVoices();
-            if (voices.length === 0) return;
-
-            const jaVoices = voices.filter(v => v.lang === 'ja-JP' || v.lang.startsWith('ja'));
-            if (jaVoices.length === 0) return;
-
-            // Priority: Google > Microsoft Online/Natural > others
-            const priorityPatterns = [
-                /google/i,
-                /microsoft.*online/i,
-                /natural/i,
-                /enhanced/i,
-                /premium/i,
-                /microsoft/i
-            ];
-
-            for (const pattern of priorityPatterns) {
-                const match = jaVoices.find(v => pattern.test(v.name));
-                if (match) {
-                    bestJapaneseVoice = match;
-                    console.log('Selected voice:', match.name);
-                    return;
-                }
-            }
-            bestJapaneseVoice = jaVoices[0];
-            console.log('Fallback voice:', jaVoices[0].name);
-        }
-
-        if ('speechSynthesis' in window) {
-            loadVoices();
-            window.speechSynthesis.onvoiceschanged = loadVoices;
-        }
-
-        // Split text into short chunks (by sentence) to avoid Chrome's ~15s cutoff bug
-        function splitIntoChunks(text) {
-            const chunks = [];
-            // Split by Japanese period, newline, or other breaks
-            const sentences = text.split(/(?<=[。．\.\!\？\?！\n])/g);
-            for (const s of sentences) {
-                const trimmed = s.trim();
-                if (trimmed.length === 0) continue;
-                // If still too long (>80 chars), split by comma
-                if (trimmed.length > 80) {
-                    const parts = trimmed.split(/(?<=[、,])/g);
-                    for (const p of parts) {
-                        const pt = p.trim();
-                        if (pt.length > 0) chunks.push(pt);
-                    }
-                } else {
-                    chunks.push(trimmed);
-                }
-            }
-            return chunks.length > 0 ? chunks : [text];
-        }
+        let currentSegmentIndex = 0;
 
         function updateVoiceDisplay() {
             const counter = document.getElementById('voice-counter');
@@ -1621,21 +1563,18 @@
             const q = filteredQuestions[voiceIndex];
             counter.textContent = (voiceIndex + 1) + ' / ' + filteredQuestions.length;
 
-            // Build segments - ANSWERS ONLY
+            // Build segments - ANSWERS ONLY (one segment per sub-question answer)
             voiceTextSegments = [];
             let displayHtml = '';
 
-            // Header (display only, not read)
+            // Header (display only, not read aloud)
             displayHtml += `<div class="card-meta" style="margin-bottom:10px;"><span class="card-badge year">${q.yearShort}</span><span class="card-badge category">${q.category}</span></div>`;
             displayHtml += `<div style="font-weight:700; color:var(--primary-color); margin-bottom:10px;">${escapeHtml(q.questionNumber)} - ${escapeHtml(q.title)}</div>`;
 
             if (q.subQuestions && q.subQuestions.length > 0) {
                 q.subQuestions.forEach(sub => {
                     const segId = voiceTextSegments.length;
-                    // Only read the model answer
-                    const answerText = sub.modelAnswer;
-                    const chunks = splitIntoChunks(answerText);
-                    voiceTextSegments.push({ segId: segId, chunks: chunks, label: sub.id });
+                    voiceTextSegments.push({ text: sub.modelAnswer, label: sub.id });
 
                     displayHtml += `<div id="voice-seg-${segId}" class="sub-answer" style="transition: background 0.3s; margin-bottom:10px;">`;
                     displayHtml += `<div class="sub-answer-label">${escapeHtml(sub.id)} - 模範解答</div>`;
@@ -1647,17 +1586,13 @@
             display.innerHTML = displayHtml;
         }
 
-        // All chunks flattened for sequential playback
-        let allChunks = [];    // [{text, segId}, ...]
-        let chunkIndex = 0;
-        let speechId = 0;      // Incremented on each play/stop to ignore stale callbacks
-
         function voicePlayPause() {
             if (!('speechSynthesis' in window)) {
                 alert('お使いのブラウザは音声合成に対応していません。');
                 return;
             }
             if (filteredQuestions.length === 0) return;
+            if (voiceTextSegments.length === 0) return;
 
             if (isPaused) {
                 window.speechSynthesis.resume();
@@ -1671,29 +1606,12 @@
                 return;
             }
 
-            // Build flat chunk list from segments
-            allChunks = [];
-            voiceTextSegments.forEach(seg => {
-                seg.chunks.forEach(text => {
-                    allChunks.push({ text: text, segId: seg.segId });
-                });
-            });
-
-            if (allChunks.length === 0) return;
-
-            chunkIndex = 0;
-            speechId++;
-            isSpeaking = true;
-            isPaused = false;
-            speakChunk(speechId);
+            currentSegmentIndex = 0;
+            speakNextSegment();
         }
 
-        function speakChunk(id) {
-            // Ignore if this play session was canceled
-            if (id !== speechId) return;
-
-            if (chunkIndex >= allChunks.length) {
-                // Done
+        function speakNextSegment() {
+            if (currentSegmentIndex >= voiceTextSegments.length) {
                 isSpeaking = false;
                 updateVoiceStatus('finished');
                 clearHighlights();
@@ -1701,57 +1619,45 @@
                 if (autoPlay && filteredQuestions.length > 0) {
                     voiceIndex = (voiceIndex + 1) % filteredQuestions.length;
                     updateVoiceDisplay();
-                    const nextId = ++speechId;
                     setTimeout(() => {
-                        allChunks = [];
-                        voiceTextSegments.forEach(seg => {
-                            seg.chunks.forEach(text => {
-                                allChunks.push({ text: text, segId: seg.segId });
-                            });
-                        });
-                        chunkIndex = 0;
-                        isSpeaking = true;
-                        speakChunk(nextId);
-                    }, 1500);
+                        currentSegmentIndex = 0;
+                        speakNextSegment();
+                    }, 1000);
                 }
                 return;
             }
 
-            const chunk = allChunks[chunkIndex];
+            const segment = voiceTextSegments[currentSegmentIndex];
+            const utterance = new SpeechSynthesisUtterance(segment.text);
+            utterance.lang = 'ja-JP';
+            utterance.rate = parseFloat(document.getElementById('voice-speed').value);
 
-            // Highlight
+            // Highlight current segment
             clearHighlights();
-            const segEl = document.getElementById('voice-seg-' + chunk.segId);
+            const segEl = document.getElementById('voice-seg-' + currentSegmentIndex);
             if (segEl) {
                 segEl.classList.add('voice-text-highlight');
                 segEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
 
-            updateVoiceStatus('reading');
-
-            const utterance = new SpeechSynthesisUtterance(chunk.text);
-            utterance.lang = 'ja-JP';
-            utterance.rate = Math.min(parseFloat(document.getElementById('voice-speed').value), 3.0);
-            if (bestJapaneseVoice) {
-                utterance.voice = bestJapaneseVoice;
-            }
-
             utterance.onend = () => {
-                if (id !== speechId) return;
-                chunkIndex++;
-                speakChunk(id);
+                currentSegmentIndex++;
+                speakNextSegment();
             };
 
             utterance.onerror = (e) => {
-                if (id !== speechId) return;
-                if (e.error === 'interrupted' || e.error === 'canceled') return;
-                console.error('Speech error:', e.error, 'chunk:', chunk.text.substring(0, 30));
-                // Skip to next chunk
-                chunkIndex++;
-                setTimeout(() => speakChunk(id), 300);
+                if (e.error !== 'interrupted' && e.error !== 'canceled') {
+                    console.error('Speech error:', e);
+                }
+                isSpeaking = false;
+                updateVoiceStatus('stopped');
+                clearHighlights();
             };
 
             currentUtterance = utterance;
+            isSpeaking = true;
+            isPaused = false;
+            updateVoiceStatus('reading');
             window.speechSynthesis.speak(utterance);
         }
 
@@ -1764,11 +1670,10 @@
         }
 
         function voiceStop() {
-            speechId++;  // Invalidate any in-flight callbacks
             window.speechSynthesis.cancel();
             isSpeaking = false;
             isPaused = false;
-            chunkIndex = 0;
+            currentSegmentIndex = 0;
             clearHighlights();
             updateVoiceStatus('stopped');
         }
@@ -1781,8 +1686,8 @@
 
         function updateVoiceStatus(status) {
             const el = document.getElementById('voice-status');
-            const progress = allChunks.length > 0
-                ? ` (${Math.min(chunkIndex + 1, allChunks.length)}/${allChunks.length})`
+            const progress = voiceTextSegments.length > 0
+                ? ` (${Math.min(currentSegmentIndex + 1, voiceTextSegments.length)}/${voiceTextSegments.length})`
                 : '';
             switch (status) {
                 case 'reading':
