@@ -348,7 +348,7 @@
         .flip-card {
             position: relative;
             width: 100%;
-            min-height: 280px;
+            height: 500px;
             transition: transform 0.6s ease;
             transform-style: preserve-3d;
             cursor: pointer;
@@ -362,11 +362,12 @@
         .flip-card-back {
             position: absolute;
             width: 100%;
-            min-height: 280px;
+            height: 100%;
             backface-visibility: hidden;
             border-radius: 16px;
             padding: 24px;
             box-shadow: var(--shadow);
+            overflow-y: auto;
         }
 
         .flip-card-front {
@@ -935,6 +936,68 @@
             font-size: 1rem;
         }
 
+        /* ========== Model Answers Section ========== */
+        .answer-item {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            margin-bottom: 16px;
+        }
+
+        .answer-item-header {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .answer-item-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 14px;
+        }
+
+        .answer-item-question {
+            font-size: 0.9rem;
+            line-height: 1.8;
+            color: var(--text-color);
+            white-space: pre-wrap;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: var(--bg-color);
+            border-radius: 10px;
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .answer-pair {
+            margin-bottom: 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .answer-pair-question {
+            padding: 12px 14px;
+            background: var(--bg-color);
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .answer-pair-answer {
+            padding: 14px;
+            font-size: 0.9rem;
+            line-height: 1.8;
+            color: var(--text-color);
+            white-space: pre-wrap;
+            background: var(--card-bg);
+            border-left: 4px solid var(--secondary-color);
+        }
+
         /* Footer */
         .footer {
             text-align: center;
@@ -1031,13 +1094,17 @@
                 <span class="tab-icon">&#127183;</span>
                 フラッシュカード
             </button>
+            <button class="tab-btn" data-tab="answers" onclick="switchTab('answers')">
+                <span class="tab-icon">&#128214;</span>
+                模範解答
+            </button>
             <button class="tab-btn" data-tab="voice" onclick="switchTab('voice')">
                 <span class="tab-icon">&#128266;</span>
-                ボイス読み上げ
+                解答ボイス読み上げ
             </button>
             <button class="tab-btn" data-tab="review" onclick="switchTab('review')">
                 <span class="tab-icon">&#9998;</span>
-                回答添削
+                解答添削
             </button>
         </div>
 
@@ -1080,7 +1147,19 @@
         </div>
 
         <!-- ==================== -->
-        <!-- Tab 2: Voice         -->
+        <!-- Tab 2: Model Answers -->
+        <!-- ==================== -->
+        <div class="tab-content" id="tab-answers">
+            <div class="card">
+                <div class="flashcard-controls">
+                    <span class="flashcard-counter" id="answers-counter">0 問</span>
+                </div>
+            </div>
+            <div id="answers-list"></div>
+        </div>
+
+        <!-- ==================== -->
+        <!-- Tab 3: Voice         -->
         <!-- ==================== -->
         <div class="tab-content" id="tab-voice">
             <div class="voice-card">
@@ -1101,7 +1180,7 @@
                 <div class="voice-settings">
                     <div class="voice-setting-item">
                         <span>&#128034;</span>
-                        <input type="range" id="voice-speed" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateSpeedDisplay()">
+                        <input type="range" id="voice-speed" min="0.5" max="3.0" step="0.1" value="1.0" oninput="updateSpeedDisplay()">
                         <span class="speed-value" id="speed-value">1.0x</span>
                         <span>&#128007;</span>
                     </div>
@@ -1293,6 +1372,7 @@
             voiceIndex = 0;
             reviewIndex = 0;
             updateFlashcard();
+            updateAnswersDisplay();
             updateVoiceDisplay();
             updateReviewDisplay();
         }
@@ -1366,17 +1446,7 @@
         }
 
         function updateFlipCardHeight() {
-            setTimeout(() => {
-                const front = document.getElementById('fc-front');
-                const back = document.getElementById('fc-back');
-                const card = document.getElementById('flip-card');
-                const frontH = front.scrollHeight;
-                const backH = back.scrollHeight;
-                const maxH = Math.max(frontH, backH, 280);
-                card.style.minHeight = maxH + 'px';
-                front.style.minHeight = maxH + 'px';
-                back.style.minHeight = maxH + 'px';
-            }, 50);
+            // Fixed height cards - no dynamic adjustment needed
         }
 
         function flipCard() {
@@ -1434,6 +1504,46 @@
                 btn.className = 'btn btn-secondary btn-sm bookmark-btn';
                 btn.innerHTML = '&#9734; ブックマーク';
             }
+        }
+
+        // =====================
+        // Model Answers
+        // =====================
+        function updateAnswersDisplay() {
+            const counter = document.getElementById('answers-counter');
+            const list = document.getElementById('answers-list');
+
+            if (filteredQuestions.length === 0) {
+                counter.textContent = '0 問';
+                list.innerHTML = '<div class="card"><div class="no-questions"><div class="no-questions-icon">&#128214;</div><div class="no-questions-text">フィルターに一致する問題がありません</div></div></div>';
+                return;
+            }
+
+            counter.textContent = filteredQuestions.length + ' 問';
+
+            let html = '';
+            filteredQuestions.forEach(q => {
+                html += '<div class="answer-item">';
+                html += '<div class="answer-item-header">';
+                html += `<span class="card-badge year">${q.yearShort}</span>`;
+                html += `<span class="card-badge category">${q.category}</span>`;
+                html += '</div>';
+                html += `<div class="answer-item-title">${escapeHtml(q.questionNumber)} - ${escapeHtml(q.title)}</div>`;
+                html += `<div class="answer-item-question">${escapeHtml(q.question)}</div>`;
+
+                if (q.subQuestions && q.subQuestions.length > 0) {
+                    q.subQuestions.forEach(sub => {
+                        html += '<div class="answer-pair">';
+                        html += `<div class="answer-pair-question">${escapeHtml(sub.id)}: ${escapeHtml(sub.text)}</div>`;
+                        html += `<div class="answer-pair-answer">${escapeHtml(sub.modelAnswer)}</div>`;
+                        html += '</div>';
+                    });
+                }
+
+                html += '</div>';
+            });
+
+            list.innerHTML = html;
         }
 
         // =====================
@@ -1508,6 +1618,49 @@
             speakNextSegment();
         }
 
+        // Voice selection - prefer high quality Japanese voices
+        let bestJapaneseVoice = null;
+        let voicesLoaded = false;
+
+        function loadVoices() {
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length === 0) return;
+            voicesLoaded = true;
+
+            // Filter Japanese voices
+            const jaVoices = voices.filter(v => v.lang === 'ja-JP' || v.lang.startsWith('ja'));
+            if (jaVoices.length === 0) return;
+
+            // Priority order for higher quality voices
+            const priorityPatterns = [
+                /google/i,
+                /microsoft.*online/i,
+                /enhanced/i,
+                /premium/i,
+                /natural/i,
+                /microsoft/i
+            ];
+
+            for (const pattern of priorityPatterns) {
+                const match = jaVoices.find(v => pattern.test(v.name));
+                if (match) {
+                    bestJapaneseVoice = match;
+                    console.log('Selected voice:', match.name);
+                    return;
+                }
+            }
+
+            // Fallback to first Japanese voice
+            bestJapaneseVoice = jaVoices[0];
+            console.log('Fallback voice:', jaVoices[0].name);
+        }
+
+        // Load voices (async in some browsers)
+        if ('speechSynthesis' in window) {
+            loadVoices();
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
         function speakNextSegment() {
             if (currentSegmentIndex >= voiceTextSegments.length) {
                 isSpeaking = false;
@@ -1529,6 +1682,9 @@
             const utterance = new SpeechSynthesisUtterance(segment.text);
             utterance.lang = 'ja-JP';
             utterance.rate = parseFloat(document.getElementById('voice-speed').value);
+            if (bestJapaneseVoice) {
+                utterance.voice = bestJapaneseVoice;
+            }
 
             // Highlight current segment
             clearHighlights();
